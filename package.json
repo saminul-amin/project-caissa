@@ -1,0 +1,50 @@
+{
+  "name": "caissa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-first, local-first, human-centered AI chess application foundation.",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@11.11.0",
+  "engines": {
+    "node": ">=24.12.0",
+    "pnpm": ">=11.11.0 <12"
+  },
+  "scripts": {
+    "dev": "corepack pnpm --parallel --filter @caissa/web --filter @caissa/maia-service dev",
+    "build": "corepack pnpm --filter @caissa/chess-core build && corepack pnpm --filter @caissa/shared-contracts build && corepack pnpm --filter @caissa/web build",
+    "lint": "corepack pnpm lint:ts && corepack pnpm lint:python",
+    "lint:ts": "eslint \"apps/web/**/*.{ts,tsx}\" \"packages/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"*.{js,ts,cjs}\"",
+    "lint:python": "uv run --frozen --project apps/maia-service ruff check apps/maia-service",
+    "format": "prettier --write \"apps/web/**/*.{ts,tsx,css,html,json,md}\" \"apps/maia-service/*.{json,md}\" \"packages/**/*.{ts,tsx,css,json,md}\" \"scripts/**/*.{mjs,md}\" \"tooling/**/*.md\" \"LICENSES/**/*.md\" \".github/**/*.yml\" \"*.{js,cjs,ts,json,yaml,yml,md}\" && uv run --frozen --project apps/maia-service ruff format apps/maia-service",
+    "format:check": "prettier --check \"apps/web/**/*.{ts,tsx,css,html,json,md}\" \"apps/maia-service/*.{json,md}\" \"packages/**/*.{ts,tsx,css,json,md}\" \"scripts/**/*.{mjs,md}\" \"tooling/**/*.md\" \"LICENSES/**/*.md\" \".github/**/*.yml\" \"*.{js,cjs,ts,json,yaml,yml,md}\" && uv run --frozen --project apps/maia-service ruff format --check apps/maia-service",
+    "typecheck": "corepack pnpm typecheck:ts",
+    "typecheck:ts": "corepack pnpm --filter @caissa/chess-core typecheck && corepack pnpm --filter @caissa/shared-contracts typecheck && corepack pnpm --filter @caissa/web typecheck",
+    "test": "corepack pnpm test:ts && corepack pnpm test:python",
+    "test:ts": "vitest run --coverage",
+    "test:python": "uv run --frozen --project apps/maia-service pytest apps/maia-service",
+    "test:e2e": "corepack pnpm --filter @caissa/web build && playwright test",
+    "architecture:check": "node scripts/check-architecture.mjs && depcruise --config .dependency-cruiser.cjs apps/web/src packages/chess-core/src packages/shared-contracts/src",
+    "scan:secrets": "node scripts/check-secrets.mjs",
+    "artifacts:check": "node scripts/check-artifacts.mjs",
+    "licenses:check": "license-checker-rseidelsohn --start apps/web --production --onlyAllow \"MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC\" --excludePackages \"@caissa/web@0.1.0;@caissa/design-tokens@0.1.0\" --summary && license-checker-rseidelsohn --start packages/shared-contracts --production --onlyAllow \"MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC\" --excludePackages \"@caissa/shared-contracts@0.1.0\" --summary",
+    "verify:python": "uv run --frozen --project apps/maia-service ruff check apps/maia-service && uv run --frozen --project apps/maia-service ruff format --check apps/maia-service && uv run --frozen --project apps/maia-service pytest apps/maia-service",
+    "verify": "corepack pnpm format:check && corepack pnpm lint && corepack pnpm typecheck && corepack pnpm test && corepack pnpm architecture:check && corepack pnpm scan:secrets && corepack pnpm artifacts:check && corepack pnpm licenses:check && corepack pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.61.1",
+    "@types/node": "26.1.1",
+    "@vitest/coverage-v8": "4.1.10",
+    "dependency-cruiser": "18.0.0",
+    "eslint": "10.7.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.3",
+    "globals": "17.7.0",
+    "license-checker-rseidelsohn": "5.0.1",
+    "prettier": "3.9.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.63.0",
+    "vitest": "4.1.10"
+  }
+}

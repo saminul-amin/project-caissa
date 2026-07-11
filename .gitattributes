@@ -1,0 +1,13 @@
+# Normalize repository text for reproducible cross-platform checkouts.
+* text=auto eol=lf
+
+# Keep common binary artifacts out of text normalization.
+*.gif binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.zip binary

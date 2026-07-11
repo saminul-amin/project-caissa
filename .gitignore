@@ -1,0 +1,43 @@
+# Dependencies and virtual environments
+node_modules/
+.pnpm-store/
+.venv/
+venv/
+*.egg-info/
+
+# Build and test output
+dist/
+build/
+coverage/
+htmlcov/
+.coverage
+playwright-report/
+test-results/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Temporary files and tool caches
+.cache/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+pnpm-debug.log*

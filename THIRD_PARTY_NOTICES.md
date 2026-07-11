@@ -1,0 +1,9 @@
+# Third-Party Notices
+
+Caissa Phase 1 uses open-source development and runtime dependencies recorded in `package.json`, `pnpm-lock.yaml`, and `apps/maia-service/pyproject.toml`.
+
+No Stockfish binary or source, Maia package or model, chessboard library, font file, sound, icon set, or image asset is distributed in this phase.
+
+Before any third-party runtime artifact is distributed, this notice and `LICENSES/` must record its exact name, version or commit, upstream source, license, modifications, and corresponding-source obligations where applicable.
+
+This file is a compliance inventory foundation and is not legal advice.

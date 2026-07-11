@@ -1,0 +1,202 @@
+@import "tailwindcss";
+@import "@caissa/design-tokens/tokens.css";
+
+@theme inline {
+  --color-app: var(--color-bg-app);
+  --color-surface: var(--color-bg-surface);
+  --color-raised: var(--color-bg-raised);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-accent: var(--color-accent);
+  --font-sans: var(--font-ui);
+  --font-serif: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg-app);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  transform: translateY(-200%);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-bg-app);
+  font-weight: 700;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-4) clamp(var(--space-4), 5vw, var(--space-8));
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+}
+
+.brand-lockup {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.brand-slogan {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.primary-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.navigation-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.navigation-link:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.navigation-link.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-focus);
+  font-weight: 600;
+}
+
+.app-main {
+  display: grid;
+  place-items: center;
+  width: min(100% - 2 * var(--space-4), 72rem);
+  margin: 0 auto;
+  padding: var(--space-12) 0;
+}
+
+.placeholder {
+  width: min(100%, 42rem);
+  padding: clamp(var(--space-6), 5vw, var(--space-10));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.placeholder h1 {
+  margin: var(--space-2) 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 6vw, 3.25rem);
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.placeholder p {
+  max-width: 65ch;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-accent) !important;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-note {
+  margin: var(--space-6) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted) !important;
+  font-size: 0.875rem;
+}
+
+.app-footer {
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+@media (max-width: 48rem) {
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .primary-navigation {
+    gap: 0;
+  }
+
+  .navigation-link {
+    padding-inline: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

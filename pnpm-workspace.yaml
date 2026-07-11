@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+catalogMode: strict
+
+minimumReleaseAgeExclude:
+  - eslint@10.7.0
+
+onlyBuiltDependencies:
+  - esbuild

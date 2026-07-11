@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "caissa-maia-service"
+version = "0.1.0"
+description = "Typed FastAPI foundation for Caissa's future Maia inference boundary."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = { text = "UNLICENSED" }
+dependencies = [
+  "fastapi==0.139.0",
+  "pydantic-settings==2.14.2",
+  "uvicorn[standard]==0.51.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx2==2.5.0",
+  "pytest==9.1.1",
+  "ruff==0.15.21",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/caissa_maia_service"]
+
+[tool.uv]
+required-version = "==0.11.8"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers -p no:cacheprovider"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["caissa_maia_service"]

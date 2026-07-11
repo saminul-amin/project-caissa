@@ -1,0 +1,86 @@
+name: Pull Request Verification
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Foundation quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.11.0 --activate
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.7"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.8"
+          enable-cache: true
+          cache-dependency-glob: apps/maia-service/uv.lock
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: uv sync --frozen --project apps/maia-service
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint TypeScript and Python
+        run: pnpm lint
+
+      - name: Type-check TypeScript
+        run: pnpm typecheck
+
+      - name: Validate Python service
+        run: pnpm verify:python
+
+      - name: Run TypeScript unit tests
+        run: pnpm test:ts
+
+      - name: Enforce architecture boundaries
+        run: pnpm architecture:check
+
+      - name: Scan for secrets
+        run: pnpm scan:secrets
+
+      - name: Check production dependency licenses
+        run: pnpm licenses:check
+
+      - name: Build packages and web application
+        run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser foundation test
+        run: pnpm test:e2e
+
+      - name: Reject committed build artifacts
+        run: pnpm artifacts:check
