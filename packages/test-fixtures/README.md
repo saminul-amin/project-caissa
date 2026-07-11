@@ -1,14 +1,18 @@
 # Test Fixtures
 
-This package will contain curated, versioned test data for Caissa.
+This package contains curated, versioned, framework-independent test data for Caissa.
 
-Planned fixture categories include:
+The current chess-rules fixture module documents:
 
-- FEN positions
-- PGN games
-- Stockfish UCI transcripts and analysis results
-- Maia requests and responses
-- Persistence records and migration cases
-- Guided-review evidence and outputs
+- Initial position
+- Castling and castling through check
+- Legal en passant and en passant that exposes the king
+- Queen promotion and knight underpromotion
+- Check, checkmate, and stalemate
+- Insufficient material
+- Threefold repetition
+- Fifty-move rule
 
-Every future fixture should record its purpose, source, license or provenance, expected behavior, and relevant engine/model/schema version. No gameplay fixtures are included in Phase 1.
+Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persistence migrations, and guided-review evidence.
+
+Every fixture records its purpose, expected behavior, and relevant source/provenance information. Fixtures must not import the chess-core implementation they verify.
