@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { CHESS_CORE_VERSION, createClock, parseClockDurationMs } from "./index";
+import {
+  CHESS_CORE_VERSION,
+  createClock,
+  createGameLifecycleState,
+  parseClockDurationMs,
+  transitionGameLifecycle,
+} from "./index";
 
 describe("chess core public API", () => {
   it("exports the foundation package version", () => {
@@ -11,5 +17,11 @@ describe("chess core public API", () => {
     expect(
       createClock({ initialMs: parseClockDurationMs(60_000), kind: "sudden-death" }),
     ).toMatchObject({ status: "idle" });
+  });
+
+  it("exports the intentional game-lifecycle entry points", () => {
+    expect(
+      transitionGameLifecycle(createGameLifecycleState(), { type: "creation-succeeded" }),
+    ).toEqual({ status: "applied", state: { phase: "ready" } });
   });
 });

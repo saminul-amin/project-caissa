@@ -32,6 +32,18 @@ export {
   type MonotonicTimestampMs,
 } from "./domain/clock-primitives";
 export {
+  createGameLifecycleState,
+  transitionGameLifecycle,
+  type GameLifecycleEvent,
+  type GameLifecycleFailure,
+  type GameLifecycleFailureCode,
+  type GameLifecycleState,
+  type GameLifecycleTransitionRejectionReason,
+  type GameLifecycleTransitionResult,
+  type GamePhase,
+  type ResumableGamePhase,
+} from "./domain/game-lifecycle";
+export {
   moveInputFromUci,
   type AppliedMove,
   type ChessMove,
