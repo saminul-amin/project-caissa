@@ -3,6 +3,35 @@ export const CHESS_CORE_VERSION = "0.1.0" as const;
 
 export { ChessJsRulesAdapter } from "./adapters/chess-js-rules-adapter";
 export {
+  commitClockMove,
+  createClock,
+  pauseClock,
+  projectClockDisplay,
+  resumeClock,
+  snapshotClock,
+  startClock,
+  stopClock,
+  type ClockDisplay,
+  type ClockDisplayProjectionResult,
+  type ClockMoveCommitResult,
+  type ClockRemaining,
+  type ClockSnapshotResult,
+  type ClockState,
+  type ClockTransitionRejectionReason,
+  type ClockTransitionResult,
+  type TimeControl,
+  type TimedClockState,
+  type TimedTimeControl,
+} from "./domain/clock";
+export {
+  parseClockDurationMs,
+  parseClockIncrementMs,
+  parseMonotonicTimestampMs,
+  type ClockDurationMs,
+  type ClockIncrementMs,
+  type MonotonicTimestampMs,
+} from "./domain/clock-primitives";
+export {
   moveInputFromUci,
   type AppliedMove,
   type ChessMove,

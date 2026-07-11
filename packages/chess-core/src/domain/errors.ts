@@ -1,4 +1,6 @@
 export type DomainValidationErrorCode =
+  | "invalid-clock-duration"
+  | "invalid-clock-increment"
   | "invalid-color"
   | "invalid-fen"
   | "invalid-game-id"
@@ -7,6 +9,7 @@ export type DomainValidationErrorCode =
   | "invalid-request-id"
   | "invalid-san"
   | "invalid-square"
+  | "invalid-monotonic-timestamp"
   | "invalid-uci";
 
 /** A malformed value encountered at the chess-domain trust boundary. */

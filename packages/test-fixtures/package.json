@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./chess-rules": "./src/chess-rules.ts"
+    "./chess-rules": "./src/chess-rules.ts",
+    "./clocks": "./src/clocks.ts",
+    "./game-lifecycle": "./src/game-lifecycle.ts"
   }
 }
