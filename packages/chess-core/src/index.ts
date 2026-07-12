@@ -55,6 +55,11 @@ export {
   type GameMoveCommandResult,
   type OpponentRequestCommandResult,
 } from "./domain/game-controller";
+export {
+  GAME_SESSION_CHECKPOINT_VERSION,
+  type GameSessionCheckpoint,
+  type GameSessionCheckpointVersion,
+} from "./domain/game-checkpoint";
 export { type GameDomainEvent } from "./domain/game-events";
 export {
   type RestartGameCommandResult,

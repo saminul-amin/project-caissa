@@ -19,6 +19,7 @@ import {
 } from "./clock";
 import type { MonotonicTimestampMs } from "./clock-primitives";
 import { GameControllerError } from "./errors";
+import { createGameSessionCheckpoint, type GameSessionCheckpoint } from "./game-checkpoint";
 import type { GameDomainEvent } from "./game-events";
 import type {
   RestartGameCommandResult,
@@ -26,6 +27,12 @@ import type {
   UndoMoveCommandResult,
   UndoMoveRejectionReason,
 } from "./game-recovery";
+import {
+  freezeGameSessionSnapshot,
+  freezeMoveRecordSnapshot,
+  freezeOpponentRequestSnapshot,
+  freezePositionSnapshot,
+} from "./game-snapshot";
 import {
   transitionGameLifecycle,
   type GameLifecycleEvent,
@@ -145,6 +152,7 @@ export interface GameController {
   abandon(command: AbandonGameCommand): GameCommandResult;
   undoMoves(command: UndoMoveCommand): UndoMoveCommandResult;
   restart(command: RestartGameCommand): RestartGameCommandResult;
+  exportCheckpoint(): GameSessionCheckpoint;
 }
 
 export interface CreateGameControllerOptions {
@@ -176,7 +184,7 @@ class AuthoritativeGameController implements GameController {
         ? undefined
         : createGameResultFromTerminalState(terminalState);
 
-    this.session = freezeGameSession({
+    this.session = freezeGameSessionSnapshot({
       activeOpponentRequest: undefined,
       clock: createInitialClock(configuration),
       configuration,
@@ -191,6 +199,10 @@ class AuthoritativeGameController implements GameController {
 
   getSession(): GameSession {
     return this.session;
+  }
+
+  exportCheckpoint(): GameSessionCheckpoint {
+    return createGameSessionCheckpoint(this.session);
   }
 
   start(now: MonotonicTimestampMs): GameCommandResult {
@@ -277,7 +289,7 @@ class AuthoritativeGameController implements GameController {
       return rejected(prior, "wrong-actor");
     }
 
-    const request = freezeOpponentRequest({
+    const request = freezeOpponentRequestSnapshot({
       expectedFen: prior.position.fen,
       expectedPly: prior.position.ply,
       expectedRevision: prior.revision,
@@ -766,7 +778,7 @@ class AuthoritativeGameController implements GameController {
             { phase: "committing" },
             this.nextTurnEvent(position.turn, prior.configuration),
           );
-      const record = freezeMoveRecord({
+      const record = freezeMoveRecordSnapshot({
         actor,
         ...(moveResult.move.captured ? { captured: moveResult.move.captured } : {}),
         clockAfter: finalClock,
@@ -1053,7 +1065,7 @@ class AuthoritativeGameController implements GameController {
   }
 
   private commitSession(next: Omit<GameSession, "configuration" | "gameId">): GameSession {
-    const session = freezeGameSession({
+    const session = freezeGameSessionSnapshot({
       ...next,
       configuration: this.session.configuration,
       gameId: this.session.gameId,
@@ -1242,73 +1254,6 @@ function assertSessionInvariants(session: GameSession, rules: ChessRulesPort): v
       "Pending opponent request and lifecycle phase are inconsistent.",
     );
   }
-}
-
-function freezeGameSession(session: GameSession): GameSession {
-  return Object.freeze({
-    ...session,
-    activeOpponentRequest: session.activeOpponentRequest
-      ? freezeOpponentRequest(session.activeOpponentRequest)
-      : undefined,
-    clock: freezeClockState(session.clock),
-    history: Object.freeze(session.history.map(freezeMoveRecord)),
-    lifecycle: freezeLifecycleState(session.lifecycle),
-    position: freezePositionSnapshot(session.position),
-    result: session.result ? Object.freeze({ ...session.result }) : undefined,
-  });
-}
-
-function freezeClockState(state: ClockState): ClockState {
-  if (state.status === "untimed") {
-    return Object.freeze({
-      ...state,
-      timeControl: Object.freeze({ kind: "untimed" as const }),
-    });
-  }
-
-  const timeControl =
-    state.timeControl.kind === "increment"
-      ? Object.freeze({
-          incrementMs: state.timeControl.incrementMs,
-          initialMs: state.timeControl.initialMs,
-          kind: "increment" as const,
-        })
-      : Object.freeze({
-          initialMs: state.timeControl.initialMs,
-          kind: "sudden-death" as const,
-        });
-
-  return Object.freeze({
-    ...state,
-    remaining: Object.freeze({ ...state.remaining }),
-    timeControl,
-  });
-}
-
-function freezeLifecycleState(state: GameLifecycleState): GameLifecycleState {
-  if (state.phase === "failed" || state.phase === "recovery") {
-    return Object.freeze({ ...state, failure: Object.freeze({ ...state.failure }) });
-  }
-  return Object.freeze({ ...state });
-}
-
-function freezePositionSnapshot(position: PositionSnapshot): PositionSnapshot {
-  return Object.freeze({
-    ...position,
-    terminalState: Object.freeze({ ...position.terminalState }),
-  });
-}
-
-function freezeMoveRecord(record: MoveRecord): MoveRecord {
-  return Object.freeze({
-    ...record,
-    clockAfter: freezeClockState(record.clockAfter),
-    clockBefore: freezeClockState(record.clockBefore),
-  });
-}
-
-function freezeOpponentRequest(request: OpponentRequestState): OpponentRequestState {
-  return Object.freeze({ ...request });
 }
 
 function freezeEvents(...events: readonly GameDomainEvent[]): readonly GameDomainEvent[] {
