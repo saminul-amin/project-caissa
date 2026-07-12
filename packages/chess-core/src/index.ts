@@ -44,6 +44,17 @@ export {
   type ResumableGamePhase,
 } from "./domain/game-lifecycle";
 export {
+  createGameController,
+  type CreateGameControllerOptions,
+  type GameCommandRejectedResult,
+  type GameCommandRejectionReason,
+  type GameCommandResult,
+  type GameController,
+  type GameMoveCommandResult,
+  type OpponentRequestCommandResult,
+} from "./domain/game-controller";
+export { type GameDomainEvent } from "./domain/game-events";
+export {
   createAbandonedGameResult,
   createTimeoutGameResult,
   type AbandonedGameResult,
