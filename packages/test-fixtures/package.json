@@ -6,6 +6,7 @@
   "exports": {
     "./chess-rules": "./src/chess-rules.ts",
     "./clocks": "./src/clocks.ts",
+    "./game-controller": "./src/game-controller.ts",
     "./game-lifecycle": "./src/game-lifecycle.ts"
   }
 }

@@ -29,6 +29,13 @@ The game-lifecycle fixture module documents:
 - Degraded, failed, and recovery phases
 - Completed and abandoned terminal phases
 
+The game-controller fixture module documents:
+
+- Human/human and human/external participant configurations
+- Untimed, sudden-death, increment, and custom-FEN starts
+- Ready, active, awaiting, paused, degraded, completed, and abandoned sessions
+- Valid and stale external-opponent proposal contexts
+
 Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persistence migrations, and guided-review evidence.
 
 Every fixture records its purpose, expected behavior, and relevant source/provenance information. Fixtures must not import the chess-core implementation they verify.

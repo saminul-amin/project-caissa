@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   CHESS_CORE_VERSION,
+  ChessJsRulesAdapter,
   createClock,
+  createGameController,
   createGameConfiguration,
   createGameLifecycleState,
   parseClockDurationMs,
@@ -39,5 +41,23 @@ describe("chess core public API", () => {
         timeControl: { kind: "untimed" },
       }),
     ).toMatchObject({ gameId: "public-api-game" });
+  });
+
+  it("exports the intentional authoritative controller entry point", () => {
+    expect(
+      createGameController({
+        configuration: {
+          allowUndo: false,
+          gameId: "public-controller",
+          initialPosition: { kind: "standard" },
+          participants: {
+            black: { kind: "external-opponent" },
+            white: { kind: "human" },
+          },
+          timeControl: { kind: "untimed" },
+        },
+        rules: new ChessJsRulesAdapter(),
+      }).getSession(),
+    ).toMatchObject({ lifecycle: { phase: "ready" }, revision: 0 });
   });
 });
