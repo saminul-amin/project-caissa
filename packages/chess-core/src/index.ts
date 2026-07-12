@@ -68,6 +68,12 @@ export {
   type UndoMoveRejectionReason,
 } from "./domain/game-recovery";
 export {
+  restoreGameController,
+  type GameControllerRestorationResult,
+  type GameRestorationRejectionReason,
+  type RestoreGameControllerOptions,
+} from "./domain/game-restoration";
+export {
   createAbandonedGameResult,
   createTimeoutGameResult,
   type AbandonedGameResult,

@@ -166,12 +166,27 @@ export function createGameController(options: CreateGameControllerOptions): Game
   return new AuthoritativeGameController(options);
 }
 
+/** Internal reconstruction seam; intentionally omitted from the package entry point. */
+export function createRestoredGameController(
+  rules: ChessRulesPort,
+  session: GameSession,
+): GameController {
+  return new AuthoritativeGameController({ configuration: session.configuration, rules }, session);
+}
+
 class AuthoritativeGameController implements GameController {
   private readonly rules: ChessRulesPort;
   private session: GameSession;
 
-  constructor(options: CreateGameControllerOptions) {
+  constructor(options: CreateGameControllerOptions, restoredSession?: GameSession) {
     this.rules = options.rules;
+    if (restoredSession) {
+      const session = freezeGameSessionSnapshot(restoredSession);
+      assertSessionInvariants(session, this.rules);
+      this.session = session;
+      return;
+    }
+
     const configuration = createGameConfiguration(options.configuration);
     const loadedPosition = this.loadConfiguredPosition(configuration);
     const terminalState = loadedPosition.terminalState;
