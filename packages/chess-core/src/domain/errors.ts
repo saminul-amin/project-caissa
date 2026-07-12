@@ -8,6 +8,7 @@ export type DomainValidationErrorCode =
   | "invalid-ply"
   | "invalid-request-id"
   | "invalid-san"
+  | "invalid-session-revision"
   | "invalid-square"
   | "invalid-monotonic-timestamp"
   | "invalid-uci";
@@ -30,5 +31,19 @@ export class ChessRulesAdapterError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "ChessRulesAdapterError";
+  }
+}
+
+export type GameControllerErrorCode =
+  "controller-invariant-failure" | "invalid-game-configuration" | "move-rollback-failed";
+
+/** A typed unexpected failure inside the authoritative game-controller boundary. */
+export class GameControllerError extends Error {
+  readonly code: GameControllerErrorCode;
+
+  constructor(code: GameControllerErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "GameControllerError";
+    this.code = code;
   }
 }

@@ -15,6 +15,7 @@ export type UciMove = Brand<string, "UciMove">;
 export type Ply = Brand<number, "Ply">;
 export type GameId = Brand<string, "GameId">;
 export type RequestId = Brand<string, "RequestId">;
+export type SessionRevision = Brand<number, "SessionRevision">;
 
 const squarePattern = /^[a-h][1-8]$/u;
 const uciPattern = /^[a-h][1-8][a-h][1-8][qrbn]?$/u;
@@ -112,6 +113,17 @@ export function parseGameId(value: string): GameId {
 
 export function parseRequestId(value: string): RequestId {
   return parseIdentifier(value, "invalid-request-id", "request") as RequestId;
+}
+
+export function parseSessionRevision(value: number): SessionRevision {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new DomainValidationError(
+      "invalid-session-revision",
+      `Invalid session revision: ${String(value)}`,
+    );
+  }
+
+  return value as SessionRevision;
 }
 
 function parseIdentifier(

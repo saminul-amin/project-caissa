@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CHESS_CORE_VERSION,
   createClock,
+  createGameConfiguration,
   createGameLifecycleState,
   parseClockDurationMs,
   transitionGameLifecycle,
@@ -23,5 +24,20 @@ describe("chess core public API", () => {
     expect(
       transitionGameLifecycle(createGameLifecycleState(), { type: "creation-succeeded" }),
     ).toEqual({ status: "applied", state: { phase: "ready" } });
+  });
+
+  it("exports the intentional game-session model entry points", () => {
+    expect(
+      createGameConfiguration({
+        allowUndo: false,
+        gameId: "public-api-game",
+        initialPosition: { kind: "standard" },
+        participants: {
+          black: { kind: "external-opponent" },
+          white: { kind: "human" },
+        },
+        timeControl: { kind: "untimed" },
+      }),
+    ).toMatchObject({ gameId: "public-api-game" });
   });
 });

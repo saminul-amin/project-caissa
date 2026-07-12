@@ -44,6 +44,36 @@ export {
   type ResumableGamePhase,
 } from "./domain/game-lifecycle";
 export {
+  createAbandonedGameResult,
+  createTimeoutGameResult,
+  type AbandonedGameResult,
+  type CompletedGameResult,
+  type DecisiveGameResult,
+  type DecisiveGameResultReason,
+  type DrawGameResult,
+  type DrawGameResultReason,
+  type GameResult,
+  type PgnResultToken,
+} from "./domain/game-result";
+export {
+  createGameConfiguration,
+  type AbandonGameCommand,
+  type GameConfiguration,
+  type GameParticipant,
+  type GameParticipants,
+  type GameSession,
+  type HumanMoveCommand,
+  type InitialPosition,
+  type MoveRecord,
+  type OpponentMoveProposal,
+  type OpponentRequestFailureCommand,
+  type OpponentRequestFailureReason,
+  type OpponentRequestState,
+  type ParticipantKind,
+  type PositionSnapshot,
+  type RequestOpponentMoveCommand,
+} from "./domain/game-session";
+export {
   moveInputFromUci,
   type AppliedMove,
   type ChessMove,
@@ -63,7 +93,9 @@ export {
 export {
   ChessRulesAdapterError,
   DomainValidationError,
+  GameControllerError,
   type DomainValidationErrorCode,
+  type GameControllerErrorCode,
 } from "./domain/errors";
 export {
   parseFen,
@@ -73,6 +105,7 @@ export {
   parsePly,
   parseRequestId,
   parseSanMove,
+  parseSessionRevision,
   parseSquare,
   parseUciMove,
   type Color,
@@ -82,6 +115,7 @@ export {
   type Ply,
   type RequestId,
   type SanMove,
+  type SessionRevision,
   type Square,
   type UciMove,
 } from "./domain/primitives";

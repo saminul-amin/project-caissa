@@ -10,6 +10,7 @@ import {
   parsePly,
   parseRequestId,
   parseSanMove,
+  parseSessionRevision,
   parseSquare,
   parseUciMove,
 } from "./primitives";
@@ -25,6 +26,7 @@ describe("chess domain primitives", () => {
     expect(parsePly(12)).toBe(12);
     expect(parseGameId("game-2026-001")).toBe("game-2026-001");
     expect(parseRequestId("request:001")).toBe("request:001");
+    expect(parseSessionRevision(7)).toBe(7);
   });
 
   it("maps every supported UCI promotion symbol", () => {
@@ -53,6 +55,7 @@ describe("chess domain primitives", () => {
     ["ply", () => parsePly(-1), "invalid-ply"],
     ["game ID", () => parseGameId("invalid id"), "invalid-game-id"],
     ["request ID", () => parseRequestId(""), "invalid-request-id"],
+    ["session revision", () => parseSessionRevision(-1), "invalid-session-revision"],
   ])("rejects an invalid %s at runtime", (_label, parse, expectedCode) => {
     expect(parse).toThrow(DomainValidationError);
 
