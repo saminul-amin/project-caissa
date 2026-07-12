@@ -5,7 +5,7 @@ deterministic clocks, controlled lifecycle phases, and game-session authority.
 
 ## Public API
 
-The package intentionally exports four domain boundaries.
+The package intentionally exports five domain boundaries.
 
 ### Chess rules
 
@@ -50,7 +50,7 @@ current state with a stable rejection reason.
   and `GameSession` models
 - `createGameController` and the injected, framework-independent `GameController` boundary
 - Commands for start, human moves, external-opponent requests and proposals, typed opponent
-  failure, pause, resume, and abandonment
+  failure, pause, resume, bounded practice undo, restart, and abandonment
 - Discriminated command results with stable rejection reasons and immutable domain events
 - A non-negative session revision incremented exactly once per applied state change
 
@@ -71,6 +71,34 @@ Version 1 timeout policy awards the win to the non-expired color. This is intent
 in `createTimeoutGameResult`; the current rules boundary does not expose reliable per-color
 possible-mating-material adjudication, so this package does not claim full FIDE dead-position
 handling for timeout results.
+
+### Recoverable domain state
+
+- `UndoPlyCount` is runtime-validated and intentionally limited to one or two plies. One ply
+  supports local corrections; two plies support removing a human move and external-opponent
+  reply together. The controller never chooses the count automatically.
+- Undo requires `allowUndo`, sufficient history, an approved lifecycle, and an optional matching
+  revision. Version 1 rejects undo while paused; callers must resume first so clock ownership is
+  unambiguous. Undo reconstructs from the configured initial position plus retained UCI history,
+  restores the earliest removed move's exact pre-move balances, and rebases its active clock to
+  caller-supplied monotonic time without charging review time.
+- Undo may reopen checkmate or rules-authority draws completed by a recorded move. A timeout that
+  recorded no move has no move to remove and therefore requires restart.
+- Restart preserves game ID and immutable configuration, reconstructs the configured initial
+  position, creates a fresh clock, clears history/result/request/failure state, increments the
+  existing revision once, and returns to `ready`. It never starts automatically. Restart from an
+  already pristine `ready` session is rejected as `already-reset`.
+- `GameSessionCheckpoint` is immutable, storage-independent domain data with
+  `checkpointVersion: 1`. Export has no event or revision side effect.
+- `restoreGameController` requires a fresh `ChessRulesPort` factory. It treats checkpoint data as
+  untrusted, validates configuration and revision, replays every UCI move, verifies SAN/FEN/ply/
+  mover/actor metadata, checks clock history, then validates final position, lifecycle, result,
+  and request consistency before constructing a controller. Inconsistent data is rejected rather
+  than repaired.
+
+Undo and restart rules reconstruction is transactional. If target reconstruction fails, the
+controller replays the complete prior history before returning a typed rejection. A rollback that
+cannot restore the authoritative prior FEN becomes a typed internal domain failure.
 
 ## Architecture boundary
 
@@ -95,10 +123,12 @@ that preserve the prior state. Malformed external values are rejected by runtime
   timeout, chess terminal adjudication, pause/resume, degraded mode, and abandonment
 - Typed domain events as return data without an event bus, persistence, network publication, or
   telemetry transport
+- One/two-ply practice undo, same-identity restart, immutable checkpoint export, and fresh-rules
+  replay reconstruction with stable corruption rejection reasons
 
 Curated data is exposed separately through `@caissa/test-fixtures/chess-rules`,
 `@caissa/test-fixtures/clocks`, `@caissa/test-fixtures/game-lifecycle`, and
-`@caissa/test-fixtures/game-controller` for tests only.
+`@caissa/test-fixtures/game-controller`, and `@caissa/test-fixtures/game-recovery` for tests only.
 
 `chess.js` 1.4.0 remains the sole production dependency. It is BSD-2-Clause licensed and is
 isolated behind the adapter.
@@ -113,6 +143,7 @@ pnpm --filter @caissa/chess-core test
 
 The command runs deterministic Vitest coverage with measured package-level thresholds.
 
-Persistence, UI, public undo, Stockfish, Maia, provider communication, and the review system are
-not implemented in this package. The rules adapter's `undo` operation is used only for private
-rollback after an unexpected failed controller commit.
+IndexedDB persistence, Dexie, serialization/migrations, UI state, Stockfish, Maia, provider
+communication, and the review system are not implemented in this package. The rules adapter's
+`undo` operation remains private rollback infrastructure; public practice undo reconstructs from
+validated history instead of exposing mutable adapter undo.

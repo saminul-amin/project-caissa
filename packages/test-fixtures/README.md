@@ -36,6 +36,13 @@ The game-controller fixture module documents:
 - Ready, active, awaiting, paused, degraded, completed, and abandoned sessions
 - Valid and stale external-opponent proposal contexts
 
+The game-recovery fixture module documents:
+
+- One- and two-ply undo, pending-request cancellation, completed-game reopening, and rejection
+- Restart from active, paused, degraded, terminal, failure/recovery, and custom-FEN states
+- Version 1 checkpoints for ready, active, waiting, paused, completed, and abandoned sessions
+- Independently corrupted move, position, clock, lifecycle, result, request, and revision fields
+
 Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persistence migrations, and guided-review evidence.
 
 Every fixture records its purpose, expected behavior, and relevant source/provenance information. Fixtures must not import the chess-core implementation they verify.

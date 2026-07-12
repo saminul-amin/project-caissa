@@ -3,11 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   CHESS_CORE_VERSION,
   ChessJsRulesAdapter,
+  GAME_SESSION_CHECKPOINT_VERSION,
   createClock,
   createGameController,
   createGameConfiguration,
   createGameLifecycleState,
   parseClockDurationMs,
+  parseUndoPlyCount,
+  restoreGameController,
   transitionGameLifecycle,
 } from "./index";
 
@@ -59,5 +62,27 @@ describe("chess core public API", () => {
         rules: new ChessJsRulesAdapter(),
       }).getSession(),
     ).toMatchObject({ lifecycle: { phase: "ready" }, revision: 0 });
+  });
+
+  it("exports bounded undo, checkpoint, and reconstruction entry points", () => {
+    expect(parseUndoPlyCount(2)).toBe(2);
+    const controller = createGameController({
+      configuration: {
+        allowUndo: true,
+        gameId: "public-recovery",
+        initialPosition: { kind: "standard" },
+        participants: { black: { kind: "human" }, white: { kind: "human" } },
+        timeControl: { kind: "untimed" },
+      },
+      rules: new ChessJsRulesAdapter(),
+    });
+    const checkpoint = controller.exportCheckpoint();
+    expect(checkpoint.checkpointVersion).toBe(GAME_SESSION_CHECKPOINT_VERSION);
+    expect(
+      restoreGameController({
+        checkpoint,
+        createRules: () => new ChessJsRulesAdapter(),
+      }).status,
+    ).toBe("restored");
   });
 });
