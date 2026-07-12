@@ -5,7 +5,7 @@ import type {
   OpponentRequestState,
 } from "./game-session";
 import type { ResumableGamePhase } from "./game-lifecycle";
-import type { Color, GameId, RequestId, SessionRevision } from "./primitives";
+import type { Color, Fen, GameId, RequestId, SessionRevision, UndoPlyCount } from "./primitives";
 
 interface GameEventBase {
   readonly gameId: GameId;
@@ -53,4 +53,22 @@ export type GameDomainEvent =
   | (GameEventBase & {
       readonly result: GameResult;
       readonly type: "game-abandoned";
+    })
+  | (GameEventBase & {
+      readonly removedMoves: readonly MoveRecord[];
+      readonly removedPlies: UndoPlyCount;
+      readonly restoredFen: Fen;
+      readonly restoredTurn: Color;
+      readonly type: "moves-undone";
+    })
+  | (GameEventBase & {
+      readonly reason: "undo";
+      readonly requestId: RequestId;
+      readonly type: "opponent-request-cancelled";
+    })
+  | (GameEventBase & {
+      readonly type: "game-reopened";
+    })
+  | (GameEventBase & {
+      readonly type: "game-restarted";
     });

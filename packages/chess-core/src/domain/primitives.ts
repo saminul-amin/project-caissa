@@ -16,6 +16,7 @@ export type Ply = Brand<number, "Ply">;
 export type GameId = Brand<string, "GameId">;
 export type RequestId = Brand<string, "RequestId">;
 export type SessionRevision = Brand<number, "SessionRevision">;
+export type UndoPlyCount = Brand<1 | 2, "UndoPlyCount">;
 
 const squarePattern = /^[a-h][1-8]$/u;
 const uciPattern = /^[a-h][1-8][a-h][1-8][qrbn]?$/u;
@@ -124,6 +125,18 @@ export function parseSessionRevision(value: number): SessionRevision {
   }
 
   return value as SessionRevision;
+}
+
+/** Version 1 intentionally supports only one- and two-ply practice takebacks. */
+export function parseUndoPlyCount(value: number): UndoPlyCount {
+  if (value !== 1 && value !== 2) {
+    throw new DomainValidationError(
+      "invalid-undo-count",
+      `Invalid undo ply count: ${String(value)}`,
+    );
+  }
+
+  return value as UndoPlyCount;
 }
 
 function parseIdentifier(

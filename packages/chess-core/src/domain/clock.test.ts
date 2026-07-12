@@ -6,6 +6,7 @@ import {
   createClock,
   pauseClock,
   projectClockDisplay,
+  rebaseActiveClock,
   resumeClock,
   snapshotClock,
   startClock,
@@ -392,6 +393,54 @@ describe("deterministic clock pause, resume, and stop", () => {
   ] as const)("rejects %s safely", (_label, transition, createState, reason) => {
     const state = createState();
     expectRejected(transition(state, timestamp(20_000)), state, reason);
+  });
+});
+
+describe("historical active-clock rebasing", () => {
+  it("preserves timed balances and active color while replacing the monotonic origin", () => {
+    const running = runningClock("white", 900);
+    const snapshot = snapshotClock(running, timestamp(1_000));
+    if (snapshot.status !== "applied") {
+      throw new Error("Expected a settled running clock fixture.");
+    }
+    const settled = snapshot.state;
+
+    const result = rebaseActiveClock(settled, "white", timestamp(25));
+
+    expect(result).toEqual({
+      state: {
+        activeColor: "white",
+        lastTimestampMs: 25,
+        remaining: { black: 300_000, white: 299_900 },
+        status: "running",
+        timeControl: fiveMinuteSuddenDeath,
+      },
+      status: "applied",
+    });
+    expect(settled).toMatchObject({ lastTimestampMs: 1_000 });
+  });
+
+  it("rebases untimed state without inventing balances", () => {
+    expect(rebaseActiveClock(createClock({ kind: "untimed" }), "black", timestamp(50))).toEqual({
+      state: { lastTimestampMs: 50, status: "untimed", timeControl: { kind: "untimed" } },
+      status: "applied",
+    });
+  });
+
+  it("rejects inactive and contradictory historical states without mutation", () => {
+    const idle = createClock(fiveMinuteSuddenDeath);
+    expect(rebaseActiveClock(idle, "white", timestamp(0))).toEqual({
+      reason: "invalid-state",
+      state: idle,
+      status: "rejected",
+    });
+
+    const running = runningClock("white", 0);
+    expect(rebaseActiveClock(running, "black", timestamp(1))).toEqual({
+      reason: "wrong-active-color",
+      state: running,
+      status: "rejected",
+    });
   });
 });
 

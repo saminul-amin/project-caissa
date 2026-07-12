@@ -20,6 +20,7 @@ import {
   type SanMove,
   type SessionRevision,
   type UciMove,
+  type UndoPlyCount,
 } from "./primitives";
 
 export type ParticipantKind = "external-opponent" | "human";
@@ -127,6 +128,16 @@ export interface OpponentRequestFailureCommand {
 export interface AbandonGameCommand {
   readonly awardedWinner?: Color;
   readonly now: MonotonicTimestampMs;
+}
+
+export interface UndoMoveCommand {
+  readonly expectedRevision?: SessionRevision;
+  readonly now: MonotonicTimestampMs;
+  readonly plies: UndoPlyCount;
+}
+
+export interface RestartGameCommand {
+  readonly expectedRevision?: SessionRevision;
 }
 
 const maximumParticipantLabelLength = 80;

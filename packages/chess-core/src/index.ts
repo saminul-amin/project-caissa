@@ -7,6 +7,7 @@ export {
   createClock,
   pauseClock,
   projectClockDisplay,
+  rebaseActiveClock,
   resumeClock,
   snapshotClock,
   startClock,
@@ -14,6 +15,7 @@ export {
   type ClockDisplay,
   type ClockDisplayProjectionResult,
   type ClockMoveCommitResult,
+  type ClockRebaseResult,
   type ClockRemaining,
   type ClockSnapshotResult,
   type ClockState,
@@ -55,6 +57,12 @@ export {
 } from "./domain/game-controller";
 export { type GameDomainEvent } from "./domain/game-events";
 export {
+  type RestartGameCommandResult,
+  type RestartGameRejectionReason,
+  type UndoMoveCommandResult,
+  type UndoMoveRejectionReason,
+} from "./domain/game-recovery";
+export {
   createAbandonedGameResult,
   createTimeoutGameResult,
   type AbandonedGameResult,
@@ -83,6 +91,8 @@ export {
   type ParticipantKind,
   type PositionSnapshot,
   type RequestOpponentMoveCommand,
+  type RestartGameCommand,
+  type UndoMoveCommand,
 } from "./domain/game-session";
 export {
   moveInputFromUci,
@@ -119,6 +129,7 @@ export {
   parseSessionRevision,
   parseSquare,
   parseUciMove,
+  parseUndoPlyCount,
   type Color,
   type Fen,
   type GameId,
@@ -129,4 +140,5 @@ export {
   type SessionRevision,
   type Square,
   type UciMove,
+  type UndoPlyCount,
 } from "./domain/primitives";

@@ -9,6 +9,7 @@ export type DomainValidationErrorCode =
   | "invalid-request-id"
   | "invalid-san"
   | "invalid-session-revision"
+  | "invalid-undo-count"
   | "invalid-square"
   | "invalid-monotonic-timestamp"
   | "invalid-uci";
@@ -35,7 +36,10 @@ export class ChessRulesAdapterError extends Error {
 }
 
 export type GameControllerErrorCode =
-  "controller-invariant-failure" | "invalid-game-configuration" | "move-rollback-failed";
+  | "controller-invariant-failure"
+  | "invalid-game-configuration"
+  | "move-rollback-failed"
+  | "rules-restoration-failed";
 
 /** A typed unexpected failure inside the authoritative game-controller boundary. */
 export class GameControllerError extends Error {

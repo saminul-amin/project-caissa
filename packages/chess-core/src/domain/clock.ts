@@ -101,6 +101,17 @@ export type ClockTransitionResult =
 export type ClockSnapshotResult = ClockTransitionResult;
 export type ClockMoveCommitResult = ClockTransitionResult;
 
+export type ClockRebaseResult =
+  | {
+      readonly state: ClockState;
+      readonly status: "applied";
+    }
+  | {
+      readonly reason: "invalid-state" | "wrong-active-color";
+      readonly state: ClockState;
+      readonly status: "rejected";
+    };
+
 export interface ClockDisplay {
   readonly activeColor: Color | undefined;
   readonly blackRemainingMs: ClockDurationMs | undefined;
@@ -365,6 +376,41 @@ export function stopClock(state: ClockState, now: MonotonicTimestampMs): ClockTr
     case "expired":
       return rejected(state, "already-expired");
   }
+}
+
+/**
+ * Rebases a historical active clock without charging elapsed time.
+ *
+ * This is intentionally separate from snapshot/resume: undo may restore a clock captured under
+ * an earlier monotonic-time origin, so only the supplied timestamp replaces that origin.
+ */
+export function rebaseActiveClock(
+  state: ClockState,
+  activeColor: Color,
+  now: MonotonicTimestampMs,
+): ClockRebaseResult {
+  if (state.status === "untimed") {
+    return { state: copyUntimedAt(state, now), status: "applied" };
+  }
+
+  if (state.status !== "running") {
+    return { reason: "invalid-state", state, status: "rejected" };
+  }
+
+  if (state.activeColor !== activeColor) {
+    return { reason: "wrong-active-color", state, status: "rejected" };
+  }
+
+  return {
+    state: {
+      activeColor,
+      lastTimestampMs: now,
+      remaining: copyRemaining(state.remaining),
+      status: "running",
+      timeControl: state.timeControl,
+    },
+    status: "applied",
+  };
 }
 
 /** Projects effective clock values without mutating or advancing the supplied state. */

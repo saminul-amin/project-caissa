@@ -5,9 +5,11 @@ import type {
   MoveRejectionReason,
   TerminalState,
 } from "./chess-rules";
+import { moveInputFromUci } from "./chess-rules";
 import {
   commitClockMove,
   pauseClock,
+  rebaseActiveClock,
   resumeClock,
   snapshotClock,
   startClock,
@@ -18,6 +20,12 @@ import {
 import type { MonotonicTimestampMs } from "./clock-primitives";
 import { GameControllerError } from "./errors";
 import type { GameDomainEvent } from "./game-events";
+import type {
+  RestartGameCommandResult,
+  RestartGameRejectionReason,
+  UndoMoveCommandResult,
+  UndoMoveRejectionReason,
+} from "./game-recovery";
 import {
   transitionGameLifecycle,
   type GameLifecycleEvent,
@@ -44,6 +52,8 @@ import {
   type OpponentRequestState,
   type PositionSnapshot,
   type RequestOpponentMoveCommand,
+  type RestartGameCommand,
+  type UndoMoveCommand,
 } from "./game-session";
 import {
   parsePly,
@@ -133,6 +143,8 @@ export interface GameController {
   pause(now: MonotonicTimestampMs): GameCommandResult;
   resume(now: MonotonicTimestampMs): GameCommandResult;
   abandon(command: AbandonGameCommand): GameCommandResult;
+  undoMoves(command: UndoMoveCommand): UndoMoveCommandResult;
+  restart(command: RestartGameCommand): RestartGameCommandResult;
 }
 
 export interface CreateGameControllerOptions {
@@ -526,6 +538,156 @@ class AuthoritativeGameController implements GameController {
     return { events, result, session, status: "completed" };
   }
 
+  undoMoves(command: UndoMoveCommand): UndoMoveCommandResult {
+    const prior = this.session;
+    if (!prior.configuration.allowUndo) {
+      return rejectedUndo(prior, "undo-disabled");
+    }
+    if (command.plies !== 1 && command.plies !== 2) {
+      return rejectedUndo(prior, "invalid-undo-count");
+    }
+    const plies: 1 | 2 = command.plies;
+    if (isStaleExpectedRevision(prior.revision, command.expectedRevision)) {
+      return rejectedUndo(prior, "stale-revision");
+    }
+    if (prior.lifecycle.phase === "abandoned") {
+      return rejectedUndo(prior, "game-abandoned");
+    }
+    if (prior.lifecycle.phase === "paused") {
+      return rejectedUndo(prior, "game-paused");
+    }
+    if (!isUndoablePhase(prior.lifecycle.phase)) {
+      return rejectedUndo(prior, "invalid-lifecycle");
+    }
+    if (prior.history.length < plies) {
+      return rejectedUndo(prior, "insufficient-history");
+    }
+
+    const retainedHistory = Object.freeze(prior.history.slice(0, -plies));
+    const removedMoves = Object.freeze(prior.history.slice(-plies));
+    const earliestRemovedMove = removedMoves[0];
+    if (!earliestRemovedMove) {
+      return rejectedUndo(prior, "insufficient-history");
+    }
+
+    const restoredPosition = this.rebuildRulesTransactionally(retainedHistory, prior.history);
+    if (!restoredPosition || restoredPosition.terminalState.status !== "ongoing") {
+      if (restoredPosition) {
+        this.restoreRulesHistoryOrThrow(prior.history, prior.position.fen);
+      }
+      return rejectedUndo(prior, "internal-restoration-failure");
+    }
+
+    const clockRebase = rebaseActiveClock(
+      earliestRemovedMove.clockBefore,
+      restoredPosition.turn,
+      command.now,
+    );
+    if (clockRebase.status === "rejected") {
+      this.restoreRulesHistoryOrThrow(prior.history, prior.position.fen);
+      return rejectedUndo(prior, "internal-restoration-failure");
+    }
+
+    const lifecycle = activeLifecycleFor(restoredPosition.turn, prior.configuration);
+    const revision = nextRevision(prior.revision);
+
+    try {
+      const session = this.commitSession({
+        activeOpponentRequest: undefined,
+        clock: clockRebase.state,
+        history: retainedHistory,
+        lifecycle,
+        position: restoredPosition,
+        result: undefined,
+        revision,
+      });
+      const events: GameDomainEvent[] = [];
+      if (prior.activeOpponentRequest) {
+        events.push({
+          gameId: session.gameId,
+          reason: "undo",
+          requestId: prior.activeOpponentRequest.requestId,
+          revision,
+          type: "opponent-request-cancelled",
+        });
+      }
+      events.push({
+        gameId: session.gameId,
+        removedMoves,
+        removedPlies: command.plies,
+        restoredFen: restoredPosition.fen,
+        restoredTurn: restoredPosition.turn,
+        revision,
+        type: "moves-undone",
+      });
+      if (prior.lifecycle.phase === "completed") {
+        events.push({ gameId: session.gameId, revision, type: "game-reopened" });
+      }
+
+      return {
+        events: freezeEvents(...events),
+        removedMoves,
+        session,
+        status: "applied",
+      };
+    } catch (error: unknown) {
+      this.restoreRulesHistoryOrThrow(prior.history, prior.position.fen);
+      if (error instanceof GameControllerError) {
+        return rejectedUndo(prior, "internal-restoration-failure");
+      }
+      throw error;
+    }
+  }
+
+  restart(command: RestartGameCommand): RestartGameCommandResult {
+    const prior = this.session;
+    if (isStaleExpectedRevision(prior.revision, command.expectedRevision)) {
+      return rejectedRestart(prior, "stale-revision");
+    }
+    if (prior.lifecycle.phase === "creating" || prior.lifecycle.phase === "committing") {
+      return rejectedRestart(prior, "invalid-lifecycle");
+    }
+    if (prior.lifecycle.phase === "ready" && isPristineReadySession(prior)) {
+      return rejectedRestart(prior, "already-reset");
+    }
+
+    const position = this.rebuildRulesTransactionally([], prior.history);
+    if (!position || position.terminalState.status !== "ongoing") {
+      if (position) {
+        this.restoreRulesHistoryOrThrow(prior.history, prior.position.fen);
+      }
+      return rejectedRestart(prior, "internal-restoration-failure");
+    }
+
+    const revision = nextRevision(prior.revision);
+    try {
+      const session = this.commitSession({
+        activeOpponentRequest: undefined,
+        clock: createInitialClock(prior.configuration),
+        history: [],
+        lifecycle: { phase: "ready" },
+        position,
+        result: undefined,
+        revision,
+      });
+      return {
+        events: freezeEvents({
+          gameId: session.gameId,
+          revision,
+          type: "game-restarted",
+        }),
+        session,
+        status: "applied",
+      };
+    } catch (error: unknown) {
+      this.restoreRulesHistoryOrThrow(prior.history, prior.position.fen);
+      if (error instanceof GameControllerError) {
+        return rejectedRestart(prior, "internal-restoration-failure");
+      }
+      throw error;
+    }
+  }
+
   private commitAuthoritativeMove(
     prior: GameSession,
     actor: "external-opponent" | "human",
@@ -782,6 +944,69 @@ class AuthoritativeGameController implements GameController {
     });
   }
 
+  private rebuildRulesTransactionally(
+    targetHistory: readonly MoveRecord[],
+    priorHistory: readonly MoveRecord[],
+  ): PositionSnapshot | undefined {
+    try {
+      return this.rebuildRulesFromHistory(targetHistory);
+    } catch {
+      this.restoreRulesHistoryOrThrow(priorHistory, this.session.position.fen);
+      return undefined;
+    }
+  }
+
+  private rebuildRulesFromHistory(history: readonly MoveRecord[]): PositionSnapshot {
+    if (this.session.configuration.initialPosition.kind === "standard") {
+      this.rules.createInitialPosition();
+    } else {
+      this.rules.loadFen(this.session.configuration.initialPosition.fen);
+    }
+
+    for (const record of history) {
+      if (this.rules.getFen() !== record.fenBefore) {
+        throw new GameControllerError(
+          "rules-restoration-failed",
+          "Move history does not connect to the reconstructed rules position.",
+        );
+      }
+      const replay = this.rules.attemptMove(moveInputFromUci(record.uci));
+      if (
+        replay.status !== "committed" ||
+        replay.move.uci !== record.uci ||
+        replay.move.san !== record.san ||
+        replay.fenAfter !== record.fenAfter
+      ) {
+        throw new GameControllerError(
+          "rules-restoration-failed",
+          "A committed move could not be reproduced while rebuilding rules state.",
+        );
+      }
+    }
+
+    return this.createPositionSnapshot(parsePly(history.length));
+  }
+
+  private restoreRulesHistoryOrThrow(history: readonly MoveRecord[], expectedFen: Fen): void {
+    try {
+      const restored = this.rebuildRulesFromHistory(history);
+      if (restored.fen !== expectedFen) {
+        throw new GameControllerError(
+          "rules-restoration-failed",
+          "Rules rollback did not restore the prior authoritative FEN.",
+        );
+      }
+    } catch (error: unknown) {
+      throw error instanceof GameControllerError
+        ? error
+        : new GameControllerError(
+            "rules-restoration-failed",
+            "Rules rollback failed after an unsuccessful reconstruction.",
+            { cause: error },
+          );
+    }
+  }
+
   private assertRejectedMovePreservedRules(expectedFen: Fen): void {
     if (this.rules.getFen() !== expectedFen) {
       this.restoreRulesPosition(expectedFen);
@@ -839,11 +1064,57 @@ class AuthoritativeGameController implements GameController {
   }
 }
 
+function rejectedUndo(
+  session: GameSession,
+  reason: UndoMoveRejectionReason,
+): Extract<UndoMoveCommandResult, { readonly status: "rejected" }> {
+  return { events: emptyEvents, reason, session, status: "rejected" };
+}
+
+function rejectedRestart(
+  session: GameSession,
+  reason: RestartGameRejectionReason,
+): Extract<RestartGameCommandResult, { readonly status: "rejected" }> {
+  return { events: emptyEvents, reason, session, status: "rejected" };
+}
+
 function rejected(
   session: GameSession,
   reason: GameCommandRejectionReason,
 ): GameCommandRejectedResult {
   return { events: emptyEvents, reason, session, status: "rejected" };
+}
+
+function isUndoablePhase(phase: GameLifecycleState["phase"]): boolean {
+  return (
+    phase === "player-turn" ||
+    phase === "opponent-turn" ||
+    phase === "awaiting-opponent" ||
+    phase === "degraded" ||
+    phase === "completed"
+  );
+}
+
+function activeLifecycleFor(
+  turn: Color,
+  configuration: GameConfiguration,
+): Extract<GameLifecycleState, { readonly phase: "opponent-turn" | "player-turn" }> {
+  return configuration.participants[turn].kind === "human"
+    ? { phase: "player-turn" }
+    : { phase: "opponent-turn" };
+}
+
+function isPristineReadySession(session: GameSession): boolean {
+  const clockIsFresh =
+    (session.clock.status === "idle" || session.clock.status === "untimed") &&
+    session.clock.lastTimestampMs === undefined;
+  return (
+    clockIsFresh &&
+    session.history.length === 0 &&
+    session.position.ply === 0 &&
+    session.result === undefined &&
+    session.activeOpponentRequest === undefined
+  );
 }
 
 function rejectTerminalSession(session: GameSession): GameCommandRejectedResult | undefined {
