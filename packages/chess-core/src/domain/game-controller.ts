@@ -67,6 +67,7 @@ import {
   parseSessionRevision,
   type Color,
   type Fen,
+  type Pgn,
   type SessionRevision,
 } from "./primitives";
 
@@ -153,6 +154,7 @@ export interface GameController {
   undoMoves(command: UndoMoveCommand): UndoMoveCommandResult;
   restart(command: RestartGameCommand): RestartGameCommandResult;
   exportCheckpoint(): GameSessionCheckpoint;
+  exportPgn(): Pgn;
 }
 
 export interface CreateGameControllerOptions {
@@ -218,6 +220,10 @@ class AuthoritativeGameController implements GameController {
 
   exportCheckpoint(): GameSessionCheckpoint {
     return createGameSessionCheckpoint(this.session);
+  }
+
+  exportPgn(): Pgn {
+    return this.rules.exportPgn();
   }
 
   start(now: MonotonicTimestampMs): GameCommandResult {

@@ -90,6 +90,8 @@ handling for timeout results.
   already pristine `ready` session is rejected as `already-reset`.
 - `GameSessionCheckpoint` is immutable, storage-independent domain data with
   `checkpointVersion: 1`. Export has no event or revision side effect.
+- `GameController.exportPgn()` is a read-only delegate to the private rules authority. It does
+  not expose the adapter, mutate the session, emit events, or change the revision.
 - `restoreGameController` requires a fresh `ChessRulesPort` factory. It treats checkpoint data as
   untrusted, validates configuration and revision, replays every UCI move, verifies SAN/FEN/ply/
   mover/actor metadata, checks clock history, then validates final position, lifecycle, result,
