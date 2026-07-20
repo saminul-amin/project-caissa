@@ -43,6 +43,13 @@ The game-recovery fixture module documents:
 - Version 1 checkpoints for ready, active, waiting, paused, completed, and abandoned sessions
 - Independently corrupted move, position, clock, lifecycle, result, request, and revision fields
 
-Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persistence migrations, and guided-review evidence.
+The persistence fixture module documents:
+
+- Active, completed, preferences, review-metadata, and analysis-cache records
+- Version, checkpoint, identifier, revision, timestamp, result, PGN, status, and key corruption
+- Safe recovery expectations without secrets, personal information, or generated review content
+
+Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persisted
+migration databases, and guided-review evidence.
 
 Every fixture records its purpose, expected behavior, and relevant source/provenance information. Fixtures must not import the chess-core implementation they verify.

@@ -2,6 +2,12 @@ packages:
   - "apps/*"
   - "packages/*"
 
+catalog:
+  "@vitest/coverage-v8": 4.1.10
+  dexie: 4.4.4
+  fake-indexeddb: 6.2.5
+  zod: 4.4.3
+
 catalogMode: strict
 
 minimumReleaseAgeExclude:

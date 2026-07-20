@@ -8,6 +8,7 @@
     "./clocks": "./src/clocks.ts",
     "./game-controller": "./src/game-controller.ts",
     "./game-recovery": "./src/game-recovery.ts",
-    "./game-lifecycle": "./src/game-lifecycle.ts"
+    "./game-lifecycle": "./src/game-lifecycle.ts",
+    "./persistence": "./src/persistence.ts"
   }
 }
