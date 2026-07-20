@@ -37,6 +37,22 @@ module.exports = {
       },
     },
     {
+      name: "persistence-infrastructure-does-not-import-react",
+      severity: "error",
+      from: { path: "^apps/web/src/infrastructure/persistence/" },
+      to: { path: "node_modules/(react|react-dom|zustand)(/|$)" },
+    },
+    {
+      name: "application-services-do-not-import-storage-records",
+      severity: "error",
+      from: {
+        path: "^apps/web/src/application/(bootstrap|game-session|history|recovery)/",
+      },
+      to: {
+        path: "^apps/web/src/infrastructure/persistence/(database|schema|storage-records|migrations)",
+      },
+    },
+    {
       name: "dexie-is-persistence-infrastructure-only",
       severity: "error",
       from: {

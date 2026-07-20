@@ -49,6 +49,12 @@ The persistence fixture module documents:
 - Version, checkpoint, identifier, revision, timestamp, result, PGN, status, and key corruption
 - Safe recovery expectations without secrets, personal information, or generated review content
 
+The application-persistence fixture module documents:
+
+- Coordinator autosave, terminal finalization, persistence failure, and retry
+- Startup restoration, corruption recovery, and terminal active-slot reconciliation
+- History pagination, review availability, explicit deletion, cleanup warnings, and PGN export
+
 Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persisted
 migration databases, and guided-review evidence.
 

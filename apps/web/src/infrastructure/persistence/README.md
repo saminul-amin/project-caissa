@@ -53,5 +53,6 @@ corepack pnpm --filter @caissa/web test
 corepack pnpm --filter @caissa/web test:coverage
 ```
 
-Tests use isolated `fake-indexeddb` factories and injected wall clocks. Application autosave,
-React/Zustand integration, and bootstrap controller restoration are not implemented yet.
+Tests use isolated `fake-indexeddb` factories and injected wall clocks. Framework-independent
+application autosave and bootstrap restoration consume these ports from outside this module.
+React/Zustand and browser lifecycle integration are not implemented yet.

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./application-persistence": "./src/application-persistence.ts",
     "./chess-rules": "./src/chess-rules.ts",
     "./clocks": "./src/clocks.ts",
     "./game-controller": "./src/game-controller.ts",

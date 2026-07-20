@@ -82,6 +82,40 @@ for (const sourceRoot of [
     }
 
     if (
+      /^apps\/web\/src\/application\/(?:bootstrap|game-session|history|recovery)\//u.test(
+        relativeFile,
+      )
+    ) {
+      if (/\b(?:indexedDB|IDBDatabase|IDBFactory|CaissaDatabase)\b/u.test(source)) {
+        report(file, "application-service-storage-boundary", "service references raw storage");
+      }
+      if (
+        /\b(?:beforeunload|pagehide|visibilitychange|setTimeout|setInterval|addEventListener)\b/u.test(
+          source,
+        )
+      ) {
+        report(
+          file,
+          "application-service-lifecycle-boundary",
+          "service uses browser lifecycle or timers",
+        );
+      }
+      if (/\b(?:Blob|FileReader|URL\.createObjectURL|fetch)\b/u.test(source)) {
+        report(
+          file,
+          "application-service-browser-boundary",
+          "service uses browser or network APIs",
+        );
+      }
+    }
+
+    if (/^apps\/web\/src\/infrastructure\/persistence\//u.test(relativeFile)) {
+      if (/from\s+["'](?:react|react-dom|zustand)(?:\/[^"']*)?["']/u.test(source)) {
+        report(file, "persistence-react-boundary", "persistence infrastructure imports UI state");
+      }
+    }
+
+    if (
       /^apps\/web\/src\//u.test(relativeFile) &&
       !/^apps\/web\/src\/infrastructure\/persistence\//u.test(relativeFile) &&
       /from\s+["']dexie(?:\/[^"']*)?["']/u.test(source)
