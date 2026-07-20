@@ -57,13 +57,40 @@ for (const sourceRoot of [
     }
 
     if (/^apps\/web\/src\/(?:features|ui)\//u.test(relativeFile)) {
-      if (/from\s+["'][^"']*infrastructure\/(?:db|storage)/u.test(source)) {
+      if (/from\s+["'][^"']*infrastructure\/(?:db|persistence|storage)/u.test(source)) {
         report(file, "ui-persistence-boundary", "UI imports a persistence implementation");
+      }
+      if (/\b(?:CaissaDatabase|indexedDB)\b/u.test(source)) {
+        report(file, "ui-database-boundary", "UI references a database implementation");
       }
     }
 
     if (/^apps\/web\/src\/features\//u.test(relativeFile) && /\bfetch\s*\(/u.test(source)) {
       report(file, "feature-transport-boundary", "feature code uses raw fetch");
+    }
+
+    if (/^apps\/web\/src\/application\//u.test(relativeFile)) {
+      if (/from\s+["']dexie(?:\/[^"']*)?["']/u.test(source)) {
+        report(file, "application-persistence-port-boundary", "application code imports Dexie");
+      }
+      if (/\b(?:indexedDB|IDBDatabase|IDBFactory)\b/u.test(source)) {
+        report(file, "application-browser-storage-boundary", "application code uses IndexedDB");
+      }
+      if (/from\s+["'][^"']*infrastructure\/persistence/u.test(source)) {
+        report(file, "application-infrastructure-boundary", "application imports an adapter");
+      }
+    }
+
+    if (
+      /^apps\/web\/src\//u.test(relativeFile) &&
+      !/^apps\/web\/src\/infrastructure\/persistence\//u.test(relativeFile) &&
+      /from\s+["']dexie(?:\/[^"']*)?["']/u.test(source)
+    ) {
+      report(
+        file,
+        "dexie-adapter-boundary",
+        "Dexie is imported outside persistence infrastructure",
+      );
     }
   }
 }

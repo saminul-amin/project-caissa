@@ -26,7 +26,24 @@ module.exports = {
       name: "ui-does-not-import-persistence-implementations",
       severity: "error",
       from: { path: "^apps/web/src/(features|ui)/" },
-      to: { path: "^apps/web/src/infrastructure/(db|storage)/" },
+      to: { path: "^apps/web/src/infrastructure/(db|persistence|storage)/" },
+    },
+    {
+      name: "application-ports-do-not-import-persistence-infrastructure",
+      severity: "error",
+      from: { path: "^apps/web/src/application/" },
+      to: {
+        path: "(^apps/web/src/infrastructure/persistence/|node_modules/dexie(/|$))",
+      },
+    },
+    {
+      name: "dexie-is-persistence-infrastructure-only",
+      severity: "error",
+      from: {
+        path: "^apps/web/src/",
+        pathNot: "^apps/web/src/infrastructure/persistence/",
+      },
+      to: { path: "node_modules/dexie(/|$)" },
     },
   ],
   options: {
