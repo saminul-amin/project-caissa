@@ -29,6 +29,27 @@ module.exports = {
       to: { path: "^apps/web/src/infrastructure/(db|persistence|storage)/" },
     },
     {
+      name: "ui-does-not-import-raw-repository-ports",
+      severity: "error",
+      from: { path: "^apps/web/src/(features|ui)/" },
+      to: { path: "^apps/web/src/application/persistence/" },
+    },
+    {
+      name: "external-board-library-is-adapter-only",
+      severity: "error",
+      from: {
+        path: "^apps/web/src/",
+        pathNot: "^apps/web/src/features/game-shell/components/ChessBoardAdapter\\.tsx$",
+      },
+      to: { path: "node_modules/react-chessboard(/|$)" },
+    },
+    {
+      name: "setup-does-not-construct-game-controller",
+      severity: "error",
+      from: { path: "^apps/web/src/features/game-setup/" },
+      to: { path: "^packages/chess-core/src/(game-controller|rules)/" },
+    },
+    {
       name: "application-ports-do-not-import-persistence-infrastructure",
       severity: "error",
       from: { path: "^apps/web/src/application/" },

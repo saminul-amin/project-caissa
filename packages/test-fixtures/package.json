@@ -10,6 +10,7 @@
     "./game-controller": "./src/game-controller.ts",
     "./game-recovery": "./src/game-recovery.ts",
     "./game-lifecycle": "./src/game-lifecycle.ts",
+    "./play-experience": "./src/play-experience.ts",
     "./persistence": "./src/persistence.ts"
   }
 }

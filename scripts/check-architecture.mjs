@@ -42,6 +42,7 @@ for (const sourceRoot of [
   for (const file of files) {
     const relativeFile = path.relative(root, file).replaceAll("\\", "/");
     const source = await readFile(file, "utf8");
+    const isTestFile = /(?:^|\/)\w[^/]*\.test\.[cm]?[jt]sx?$/u.test(relativeFile);
 
     if (/^packages\/chess-core\//u.test(relativeFile)) {
       if (/from\s+["'](?:react|react-dom|zustand|dexie)(?:\/[^"']*)?["']/u.test(source)) {
@@ -63,10 +64,58 @@ for (const sourceRoot of [
       if (/\b(?:CaissaDatabase|indexedDB)\b/u.test(source)) {
         report(file, "ui-database-boundary", "UI references a database implementation");
       }
+      if (
+        /from\s+["'][^"']*application\/persistence/u.test(source) ||
+        /\b(?:GameRepository|ReviewRepository|PreferencesRepository|AnalysisCacheRepository)\b/u.test(
+          source,
+        )
+      ) {
+        report(file, "ui-repository-boundary", "UI imports a raw repository port");
+      }
+      if (/\b(?:ActiveGameRecord|CompletedGameRecordV1|StorageRecord)\b/u.test(source)) {
+        report(file, "ui-storage-record-boundary", "UI references a persistence storage record");
+      }
+      if (/\b(?:ChessJsRulesAdapter|ChessRulesPort)\b/u.test(source)) {
+        report(file, "ui-rules-implementation-boundary", "UI references chess-rules authority");
+      }
+      if (/from\s+["']chess\.js["']/u.test(source)) {
+        report(file, "ui-chess-js-boundary", "UI imports chess.js");
+      }
+      if (/\b(?:crypto(?:\.randomUUID)?|performance\.now)\s*\(/u.test(source)) {
+        report(file, "ui-platform-port-boundary", "UI directly uses browser identity or time APIs");
+      }
     }
 
     if (/^apps\/web\/src\/features\//u.test(relativeFile) && /\bfetch\s*\(/u.test(source)) {
       report(file, "feature-transport-boundary", "feature code uses raw fetch");
+    }
+
+    if (
+      !/\/features\/game-shell\/components\/ChessBoardAdapter\.tsx$/u.test(relativeFile) &&
+      /from\s+["']react-chessboard["']/u.test(source)
+    ) {
+      report(
+        file,
+        "chessboard-adapter-boundary",
+        "react-chessboard is imported outside its adapter",
+      );
+    }
+
+    if (
+      /^apps\/web\/src\/features\/game-setup\//u.test(relativeFile) &&
+      /\b(?:createGameController|GameController|ChessJsRulesAdapter)\b/u.test(source)
+    ) {
+      report(file, "setup-controller-boundary", "game setup constructs domain authority");
+    }
+
+    if (
+      !isTestFile &&
+      /^apps\/web\/src\/features\/game-shell\//u.test(relativeFile) &&
+      /\.\s*(?:start|submitHumanMove|requestOpponentMove|commitOpponentMove|rejectOpponentRequest|pause|resume|undoMoves|restart|abandon)\s*\(/u.test(
+        source,
+      )
+    ) {
+      report(file, "read-only-shell-boundary", "game shell invokes a gameplay mutation");
     }
 
     if (/^apps\/web\/src\/application\//u.test(relativeFile)) {

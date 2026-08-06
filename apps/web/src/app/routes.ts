@@ -1,5 +1,5 @@
 export interface AppRoute {
-  readonly description: string;
+  readonly description?: string;
   readonly label: string;
   readonly path: string;
 }
@@ -8,17 +8,10 @@ export const APP_ROUTES = [
   {
     path: "/",
     label: "Home",
-    description: "The Caissa home experience has not been implemented yet.",
   },
   {
-    path: "/play",
+    path: "/play/new",
     label: "Play",
-    description: "Chess gameplay has not been implemented yet.",
-  },
-  {
-    path: "/review",
-    label: "Review",
-    description: "Post-game review has not been implemented yet.",
   },
   {
     path: "/history",

@@ -58,13 +58,70 @@ async function serveBuiltApp(requestUrl: string, response: ServerResponse): Prom
   }
 }
 
-test("the application shell exposes accessible Phase 1 navigation", async ({ page }) => {
+test("a fresh local game remains ready after creation and restoration", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  await page.evaluate(
+    (databaseName) =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(databaseName);
+        request.addEventListener("success", () => {
+          resolve();
+        });
+        request.addEventListener("error", () => {
+          reject(request.error ?? new Error("Database cleanup failed."));
+        });
+        request.addEventListener("blocked", () => {
+          reject(new Error("Database cleanup was blocked."));
+        });
+      }),
+    "caissa",
+  );
+  await page.reload();
+
+  await expect(
+    page.getByRole("heading", { name: "Play Chess Beyond the Best Move" }),
+  ).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Play" }).click();
+  await page.getByRole("link", { name: "Play a Game" }).click();
+  await expect(page).toHaveURL(/\/play\/new$/);
+  await expect(page.getByRole("heading", { name: "Create a game" })).toBeVisible();
+
+  await page.getByRole("radio", { name: /3 minutes \+ 2 seconds/i }).check();
+  await page.getByRole("radio", { name: /^Black$/i }).check();
+  await page.getByRole("checkbox", { name: /Allow undo/i }).uncheck();
+  await page.getByRole("button", { name: "Create Game" }).click();
+
   await expect(page).toHaveURL(/\/play$/);
-  await expect(page.getByText("Chess gameplay has not been implemented yet.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ready" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Black orientation/i })).toBeVisible();
+  await expect(page.getByText(/game remains ready and no clock has been started/i)).toBeVisible();
+  await expect(page.getByLabel("White clock")).toHaveText("3:00");
+  await expect(page.getByLabel("Black clock")).toHaveText("3:00");
+  await expect(page.getByText("3 + 2")).toBeVisible();
+  await expect(page.getByText("Disabled")).toBeVisible();
+  await expect(page.getByText("Active turn")).toHaveCount(0);
+
+  await page.reload();
+
+  await expect(page.getByRole("heading", { name: "Ready" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /White orientation/i })).toBeVisible();
+  await expect(page.getByLabel("White clock")).toHaveText("3:00");
+  await expect(page.getByLabel("Black clock")).toHaveText("3:00");
+  await expect(page.getByText("Active turn")).toHaveCount(0);
+
+  await page.setViewportSize({ height: 844, width: 390 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Ready" })).toBeVisible();
+  expect(
+    await page
+      .locator(".route-fade")
+      .evaluate((element) => Number.parseFloat(getComputedStyle(element).animationDuration)),
+  ).toBeLessThanOrEqual(0.001);
 });

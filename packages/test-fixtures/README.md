@@ -55,6 +55,12 @@ The application-persistence fixture module documents:
 - Startup restoration, corruption recovery, and terminal active-slot reconciliation
 - History pagination, review availability, explicit deletion, cleanup warnings, and PGN export
 
+The play-experience fixture module documents:
+
+- Restoring, empty, restored, recovery-required, unavailable, and failed startup presentation
+- Every approved setup choice plus replacement, validation, and persistence outcomes
+- Ready, active, paused, waiting, degraded, terminal, persistence-warning, and move-history shells
+
 Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persisted
 migration databases, and guided-review evidence.
 

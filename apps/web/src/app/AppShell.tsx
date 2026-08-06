@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 
-import { APP_ROUTES } from "../../app/routes";
+import { APP_ROUTES } from "./routes";
 
 export function AppShell({ children }: PropsWithChildren) {
   return (
@@ -10,10 +10,10 @@ export function AppShell({ children }: PropsWithChildren) {
         Skip to main content
       </a>
       <header className="app-header">
-        <div className="brand-lockup" aria-label="Caissa">
+        <Link className="brand-lockup" to="/" aria-label="Caissa home">
           <span className="brand-name">Caissa</span>
           <span className="brand-slogan">Beyond the Best Move</span>
-        </div>
+        </Link>
         <nav aria-label="Primary navigation">
           <ul className="primary-navigation">
             {APP_ROUTES.map((route) => (
@@ -36,7 +36,7 @@ export function AppShell({ children }: PropsWithChildren) {
         {children}
       </main>
       <footer className="app-footer">
-        <p>Phase 1 foundation · No chess or AI features are active.</p>
+        <p>Local-first by design · Your active game stays in this browser.</p>
       </footer>
     </div>
   );
