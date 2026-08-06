@@ -1,0 +1,1 @@
+export { GameSetupPage } from "./GameSetupPage";
