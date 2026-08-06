@@ -5,18 +5,28 @@ export interface MonotonicClock {
 }
 
 export interface PerformanceClockSource {
+  readonly timeOrigin: number;
   now(): number;
 }
 
-/** Isolates the browser's fractional high-resolution clock behind integer domain time. */
+/** Isolates cross-navigation browser time behind the integer domain boundary. */
 export class BrowserMonotonicClock implements MonotonicClock {
   constructor(private readonly source: PerformanceClockSource = performance) {}
 
   now(): MonotonicTimestampMs {
-    const value = this.source.now();
-    if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(Math.trunc(value))) {
-      return parseMonotonicTimestampMs(value);
+    const timeOrigin = this.source.timeOrigin;
+    const elapsed = this.source.now();
+    if (!isSafeNonNegativePlatformTime(timeOrigin)) {
+      return parseMonotonicTimestampMs(timeOrigin);
     }
-    return parseMonotonicTimestampMs(Math.trunc(value));
+    if (!isSafeNonNegativePlatformTime(elapsed)) {
+      return parseMonotonicTimestampMs(elapsed);
+    }
+
+    return parseMonotonicTimestampMs(Math.trunc(timeOrigin + elapsed));
   }
+}
+
+function isSafeNonNegativePlatformTime(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && Number.isSafeInteger(Math.trunc(value));
 }

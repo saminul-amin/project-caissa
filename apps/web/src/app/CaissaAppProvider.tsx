@@ -12,6 +12,8 @@ import {
   projectClockDisplay,
   type ClockDisplayProjectionResult,
   type GameSession,
+  type LegalMove,
+  type LegalMoveQuery,
 } from "@caissa/chess-core";
 
 import {
@@ -29,6 +31,12 @@ import {
   createBrowserCaissaApplication,
   type CaissaApplication,
 } from "../infrastructure/composition";
+import { mapMoveOperationResult, mapStartOperationResult } from "./game-runtime-results";
+import type {
+  MoveSubmissionUiResult,
+  StartGameUiResult,
+  SubmitCurrentHumanMoveCommand,
+} from "./game-runtime-results";
 
 export type AppStartupViewState =
   | { readonly status: "restoring" }
@@ -52,12 +60,17 @@ export type CreateGameActionResult =
   | { readonly status: "storage-unavailable" | "failed" };
 
 export interface CaissaAppActions {
-  confirmActiveGameReplacement(setup: NewGameSetup): Promise<CreateGameActionResult>;
-  continueWithoutRestoring(): void;
-  createNewGame(command: CreateNewGameCommand): Promise<CreateGameActionResult>;
-  discardActiveGame(): Promise<"discarded" | "failed">;
-  retryCurrentGamePersistence(): Promise<"nothing-pending" | "succeeded" | "failed">;
-  retryStartup(): Promise<void>;
+  readonly confirmActiveGameReplacement: (setup: NewGameSetup) => Promise<CreateGameActionResult>;
+  readonly continueWithoutRestoring: () => void;
+  readonly createNewGame: (command: CreateNewGameCommand) => Promise<CreateGameActionResult>;
+  readonly discardActiveGame: () => Promise<"discarded" | "failed">;
+  readonly readCurrentLegalMoves: (query?: LegalMoveQuery) => readonly LegalMove[];
+  readonly retryCurrentGamePersistence: () => Promise<"nothing-pending" | "succeeded" | "failed">;
+  readonly retryStartup: () => Promise<void>;
+  readonly startCurrentGame: () => Promise<StartGameUiResult>;
+  readonly submitCurrentHumanMove: (
+    command: SubmitCurrentHumanMoveCommand,
+  ) => Promise<MoveSubmissionUiResult>;
 }
 
 export interface CaissaAppContextValue {
@@ -105,6 +118,12 @@ export function CaissaAppProvider({
   const mounted = useRef(false);
   const startupStarted = useRef(false);
   const startupRequest = useRef(0);
+  const runtimeRef = useRef<RuntimeOwner | undefined>(runtime);
+  const pendingMutation = useRef<GameSessionCoordinator | undefined>(undefined);
+
+  useEffect(() => {
+    runtimeRef.current = runtime;
+  }, [runtime]);
 
   const restore = useCallback(
     async (useRecoveryService = false): Promise<void> => {
@@ -191,8 +210,57 @@ export function CaissaAppProvider({
         setRuntimeVersion((value) => value + 1);
         return result.status;
       },
+      readCurrentLegalMoves(query) {
+        return runtime?.coordinator.getLegalMoves(query) ?? Object.freeze([]);
+      },
       retryStartup() {
         return restore(true);
+      },
+      async startCurrentGame() {
+        if (!runtime) return Object.freeze({ messageKey: "no-active-game", status: "failed" });
+        const owner = runtime;
+        if (pendingMutation.current === owner.coordinator) {
+          return Object.freeze({
+            messageKey: "operation-in-progress",
+            status: "blocked",
+          });
+        }
+        pendingMutation.current = owner.coordinator;
+        try {
+          const result = await owner.coordinator.start(application.monotonicClock.now());
+          if (runtimeRef.current !== owner) {
+            return Object.freeze({ messageKey: "position-changed", status: "rejected" });
+          }
+          setRuntimeVersion((value) => value + 1);
+          return mapStartOperationResult(result);
+        } finally {
+          if (pendingMutation.current === owner.coordinator) pendingMutation.current = undefined;
+        }
+      },
+      async submitCurrentHumanMove(command) {
+        if (!runtime) return Object.freeze({ messageKey: "no-active-game", status: "failed" });
+        const owner = runtime;
+        if (pendingMutation.current === owner.coordinator) {
+          return Object.freeze({
+            messageKey: "operation-in-progress",
+            status: "blocked",
+          });
+        }
+        pendingMutation.current = owner.coordinator;
+        try {
+          const result = await owner.coordinator.submitHumanMove({
+            expectedRevision: command.expectedRevision,
+            move: command.move,
+            now: application.monotonicClock.now(),
+          });
+          if (runtimeRef.current !== owner) {
+            return Object.freeze({ messageKey: "position-changed", status: "rejected" });
+          }
+          setRuntimeVersion((value) => value + 1);
+          return mapMoveOperationResult(result);
+        } finally {
+          if (pendingMutation.current === owner.coordinator) pendingMutation.current = undefined;
+        }
       },
     }),
     [application, createGame, restore, runtime],

@@ -11,6 +11,7 @@ import {
   type PreferencesRepository,
 } from "../application";
 import { createCaissaApplication, type CaissaApplication } from "../infrastructure/composition";
+import type { MonotonicClock } from "../infrastructure/time";
 import { MemoryGameRepository, MemoryReviewRepository } from "./application-service-test-kit";
 import { FixedWallClock } from "./persistence-test-kit";
 
@@ -24,6 +25,7 @@ export interface TestApplicationContext {
 
 export interface TestApplicationOptions {
   readonly createRules?: () => ChessRulesPort;
+  readonly monotonicClock?: MonotonicClock;
 }
 
 export function createTestApplication(
@@ -54,7 +56,9 @@ export function createTestApplication(
       },
     },
     gameRepository,
-    monotonicClock: { now: () => parseMonotonicTimestampMs(1_000) },
+    monotonicClock: options.monotonicClock ?? {
+      now: () => parseMonotonicTimestampMs(1_000),
+    },
     preferencesRepository,
     reviewRepository,
     wallClock: new FixedWallClock(),
