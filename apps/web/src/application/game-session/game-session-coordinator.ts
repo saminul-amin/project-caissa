@@ -54,6 +54,7 @@ export interface GameSessionCoordinator {
 export interface CreateGameSessionCoordinatorOptions {
   readonly controller: GameController;
   readonly gameRepository: GameRepository;
+  readonly initialActiveSaveFailure?: PersistenceError;
   readonly lastPersistedRevision?: SessionRevision;
   readonly startedAt?: ReturnType<WallClock["nowEpochMs"]>;
   readonly wallClock: WallClock;
@@ -94,7 +95,21 @@ class SerializedGameSessionCoordinator implements GameSessionCoordinator {
     this.gameRepository = options.gameRepository;
     this.wallClock = options.wallClock;
     this.startedAt = options.startedAt;
-    this.persistenceState = cleanState(options.lastPersistedRevision);
+    if (options.initialActiveSaveFailure) {
+      const checkpoint = this.controller.exportCheckpoint();
+      this.pendingPersistence = Object.freeze({
+        checkpoint,
+        kind: "active",
+        revision: checkpoint.revision,
+      });
+      this.persistenceState = pendingState(
+        this.pendingPersistence,
+        freezePersistenceError(options.initialActiveSaveFailure),
+        options.lastPersistedRevision,
+      );
+    } else {
+      this.persistenceState = cleanState(options.lastPersistedRevision);
+    }
   }
 
   getSession(): GameSession {

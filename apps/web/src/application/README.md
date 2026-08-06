@@ -21,6 +21,16 @@ active checkpoint or completed record as a private retry candidate, exposes an i
 logic, increments a revision, or emits gameplay events. Commands and retries share a promise
 queue so writes cannot overtake revisions; the queue recovers after rejected or failed work.
 
+## New-game creation
+
+`NewGameService` validates untrusted setup values, checks the active slot through `GameRepository`,
+and creates only the approved standard-position local human-versus-human configuration. A valid
+active record blocks replacement until the caller supplies the literal confirmation token;
+corrupted data remains owned by the recovery flow. The service creates a ready controller, writes
+its first checkpoint, and returns a coordinator without starting a turn or clock. Failed initial
+persistence returns an honest in-memory `created-unsaved` result with the exact checkpoint retained
+for bounded retry.
+
 ## Startup and recovery
 
 `GameStartupService` reads the active slot through `GameRepository`, restores with a fresh rules
