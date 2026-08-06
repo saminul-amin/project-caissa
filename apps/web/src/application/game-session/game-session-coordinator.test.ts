@@ -1,4 +1,4 @@
-import { parseSessionRevision, parseUndoPlyCount } from "@caissa/chess-core";
+import { parseSessionRevision, parseSquare, parseUndoPlyCount } from "@caissa/chess-core";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { FixedWallClock } from "../../test/persistence-test-kit";
@@ -24,6 +24,21 @@ describe("GameSessionCoordinator command autosave", () => {
   beforeEach(() => {
     repository = new MemoryGameRepository();
     wallClock = new FixedWallClock();
+  });
+
+  it("delegates legal-move reads without queueing or persistence side effects", () => {
+    const controller = createControllerFixture();
+    const coordinator = create(controller, repository, wallClock);
+    const priorSession = coordinator.getSession();
+    const priorPersistence = coordinator.getPersistenceState();
+
+    const moves = coordinator.getLegalMoves({ from: parseSquare("e2") });
+
+    expect(moves.map((move) => move.uci)).toEqual(["e2e3", "e2e4"]);
+    expect(Object.isFrozen(moves)).toBe(true);
+    expect(coordinator.getSession()).toBe(priorSession);
+    expect(coordinator.getPersistenceState()).toBe(priorPersistence);
+    expect(repository.calls).toEqual([]);
   });
 
   it("delegates start once and saves the resulting active checkpoint", async () => {

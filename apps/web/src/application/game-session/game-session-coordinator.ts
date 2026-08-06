@@ -3,6 +3,8 @@ import type {
   GameController,
   GameSession,
   HumanMoveCommand,
+  LegalMove,
+  LegalMoveQuery,
   MonotonicTimestampMs,
   OpponentMoveProposal,
   OpponentRequestFailureCommand,
@@ -34,6 +36,7 @@ import type {
 
 export interface GameSessionCoordinator {
   getSession(): GameSession;
+  getLegalMoves(query?: LegalMoveQuery): readonly LegalMove[];
   getPersistenceState(): SessionPersistenceState;
   start(now: MonotonicTimestampMs): Promise<GameOperationResult>;
   submitHumanMove(command: HumanMoveCommand): Promise<GameOperationResult>;
@@ -114,6 +117,10 @@ class SerializedGameSessionCoordinator implements GameSessionCoordinator {
 
   getSession(): GameSession {
     return this.controller.getSession();
+  }
+
+  getLegalMoves(query?: LegalMoveQuery): readonly LegalMove[] {
+    return this.controller.getLegalMoves(query);
   }
 
   getPersistenceState(): SessionPersistenceState {

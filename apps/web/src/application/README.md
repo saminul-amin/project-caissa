@@ -21,6 +21,12 @@ active checkpoint or completed record as a private retry candidate, exposes an i
 logic, increments a revision, or emits gameplay events. Commands and retries share a promise
 queue so writes cannot overtake revisions; the queue recovers after rejected or failed work.
 
+`getLegalMoves` is the coordinator's read-only interaction boundary. It delegates directly to
+the controller, returns immutable safe candidates, does not enter the mutation queue, and does
+not change session revision, events, clock, lifecycle, or persistence. Human moves still use
+the serialized `submitHumanMove` command with caller-supplied monotonic time and an expected
+revision. React receives only bounded safe results; it never receives the mutable coordinator.
+
 ## New-game creation
 
 `NewGameService` validates untrusted setup values, checks the active slot through `GameRepository`,

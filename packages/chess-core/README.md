@@ -13,6 +13,8 @@ The package intentionally exports five domain boundaries.
   `Ply`, `GameId`, and `RequestId`
 - `ChessRulesPort`, immutable position and move contracts, terminal-state contracts, and
   discriminated move/undo results
+- `GameController.getLegalMoves` as an immutable read-only delegate to the private rules port;
+  reads never revise the session, emit events, settle clocks, or expose the adapter
 - `moveInputFromUci` for converting external UCI text into a typed move request
 - `ChessJsRulesAdapter`, the approved implementation of `ChessRulesPort`
 - Typed `DomainValidationError` and `ChessRulesAdapterError` boundaries

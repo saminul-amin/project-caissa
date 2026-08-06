@@ -1,5 +1,7 @@
 import type {
   ChessRulesPort,
+  LegalMove,
+  LegalMoveQuery,
   MoveApplicationResult,
   MoveInput,
   MoveRejectionReason,
@@ -140,6 +142,7 @@ export interface GameCommandRejectedResult {
 
 export interface GameController {
   getSession(): GameSession;
+  getLegalMoves(query?: LegalMoveQuery): readonly LegalMove[];
   start(now: MonotonicTimestampMs): GameCommandResult;
   submitHumanMove(command: HumanMoveCommand): GameMoveCommandResult;
   requestOpponentMove(command: RequestOpponentMoveCommand): OpponentRequestCommandResult;
@@ -216,6 +219,10 @@ class AuthoritativeGameController implements GameController {
 
   getSession(): GameSession {
     return this.session;
+  }
+
+  getLegalMoves(query?: LegalMoveQuery): readonly LegalMove[] {
+    return Object.freeze(this.rules.getLegalMoves(query).map((move) => Object.freeze({ ...move })));
   }
 
   exportCheckpoint(): GameSessionCheckpoint {
