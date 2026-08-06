@@ -21,6 +21,16 @@
   --color-accent-soft: rgb(62 157 137 / 14%);
   --color-focus: #9ed4c6;
 
+  --color-board-light-square: #cfc4af;
+  --color-board-dark-square: #586b62;
+  --color-board-last-move-light: #b8b67e;
+  --color-board-last-move-dark: #7e8d62;
+  --color-board-check: #a85e59;
+
+  --color-status-success: #4f9c76;
+  --color-status-warning: #c7963e;
+  --color-status-error: #c66d67;
+
   --font-display: "Source Serif 4", Georgia, serif;
   --font-ui: "Manrope", Inter, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
@@ -45,6 +55,14 @@
   --radius-lg: 1rem;
   --radius-xl: 1.375rem;
   --radius-pill: 999px;
+
+  --shadow-sm: 0 4px 12px rgb(0 0 0 / 24%);
+  --shadow-md: 0 10px 30px rgb(0 0 0 / 30%);
+  --shadow-board: 0 18px 44px rgb(0 0 0 / 34%);
+
+  --z-sticky: 20;
+  --z-overlay: 60;
+  --z-dialog: 80;
 
   --motion-instant: 80ms;
   --motion-fast: 140ms;
