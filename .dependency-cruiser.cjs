@@ -44,6 +44,14 @@ module.exports = {
       to: { path: "node_modules/react-chessboard(/|$)" },
     },
     {
+      name: "board-adapter-does-not-import-application-services",
+      severity: "error",
+      from: {
+        path: "^apps/web/src/features/game-shell/components/ChessBoardAdapter\\.tsx$",
+      },
+      to: { path: "^apps/web/src/application/" },
+    },
+    {
       name: "setup-does-not-construct-game-controller",
       severity: "error",
       from: { path: "^apps/web/src/features/game-setup/" },

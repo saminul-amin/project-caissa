@@ -78,10 +78,16 @@ for (const sourceRoot of [
       if (/\b(?:ChessJsRulesAdapter|ChessRulesPort)\b/u.test(source)) {
         report(file, "ui-rules-implementation-boundary", "UI references chess-rules authority");
       }
+      if (/\b(?:createGameController|new\s+GameController)\b/u.test(source)) {
+        report(file, "ui-controller-construction-boundary", "UI constructs a game controller");
+      }
       if (/from\s+["']chess\.js["']/u.test(source)) {
         report(file, "ui-chess-js-boundary", "UI imports chess.js");
       }
-      if (/\b(?:crypto(?:\.randomUUID)?|performance\.now)\s*\(/u.test(source)) {
+      if (
+        /\b(?:crypto(?:\.randomUUID)?|performance\.now|Date\.now)\s*\(/u.test(source) ||
+        /\bperformance\.timeOrigin\b/u.test(source)
+      ) {
         report(file, "ui-platform-port-boundary", "UI directly uses browser identity or time APIs");
       }
     }
@@ -115,7 +121,40 @@ for (const sourceRoot of [
         source,
       )
     ) {
-      report(file, "read-only-shell-boundary", "game shell invokes a gameplay mutation");
+      report(file, "bounded-game-shell-boundary", "game shell bypasses its interaction facade");
+    }
+
+    if (/\/features\/game-shell\/components\/ChessBoardAdapter\.tsx$/u.test(relativeFile)) {
+      if (
+        /from\s+["'][^"']*(?:application|game-session-coordinator)/u.test(source) ||
+        /\bGameSessionCoordinator\b/u.test(source)
+      ) {
+        report(
+          file,
+          "board-adapter-application-boundary",
+          "board adapter imports application code",
+        );
+      }
+      if (/\b(?:getLegalMoves|ChessRulesPort|ChessJsRulesAdapter)\b/u.test(source)) {
+        report(file, "board-adapter-legality-boundary", "board adapter calculates chess legality");
+      }
+      if (/\b(?:useState|setPosition|positionState)\b/u.test(source)) {
+        report(file, "board-adapter-position-boundary", "board adapter stores position state");
+      }
+    }
+
+    if (/\/features\/game-shell\/board-interaction\.ts$/u.test(relativeFile)) {
+      if (/\b(?:Fen|setFen|positionFen)\b/u.test(source)) {
+        report(file, "board-interaction-position-boundary", "transient interaction owns FEN state");
+      }
+    }
+
+    if (
+      !isTestFile &&
+      /^apps\/web\/src\/features\/game-shell\//u.test(relativeFile) &&
+      /\.\s*(?:saveActiveGame|finalizeGame|saveCompletedGame)\s*\(/u.test(source)
+    ) {
+      report(file, "game-shell-persistence-boundary", "game shell calls persistence directly");
     }
 
     if (/^apps\/web\/src\/application\//u.test(relativeFile)) {

@@ -1,22 +1,37 @@
 import { MemoryRouter } from "react-router-dom";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 import type { CaissaApplication } from "../infrastructure/composition";
+import type { GamePersistenceResult } from "../application";
 import {
   at,
   createControllerFixture,
+  createDeferred,
   MemoryGameRepository,
 } from "../test/application-service-test-kit";
 import { createTestApplication } from "../test/caissa-app-test-kit";
 
+const appBoardSpy = vi.hoisted(() => vi.fn<(options: AppBoardOptions | undefined) => void>());
+
 vi.mock("react-chessboard", () => ({
-  Chessboard: ({ options }: { readonly options?: { readonly position?: string } }) => (
-    <div data-position={options?.position} data-testid="external-board" />
-  ),
+  Chessboard: ({ options }: { readonly options?: AppBoardOptions }) => {
+    appBoardSpy(options);
+    return <div data-position={options?.position} data-testid="external-board" />;
+  },
 }));
+
+interface AppBoardOptions {
+  readonly allowDragging?: boolean;
+  readonly onPieceDrop?: (event: {
+    readonly sourceSquare: string;
+    readonly targetSquare: string | null;
+  }) => boolean;
+  readonly onSquareClick?: (event: { readonly square: string }) => void;
+  readonly position?: string;
+}
 
 function renderApp(
   path = "/",
@@ -38,6 +53,12 @@ function renderInjectedApp(path: string, application: CaissaApplication) {
       <App application={application} />
     </MemoryRouter>,
   );
+}
+
+function currentBoardOptions(): AppBoardOptions {
+  const options = appBoardSpy.mock.lastCall?.[0];
+  if (!options) throw new Error("Expected the external board adapter to render.");
+  return options;
 }
 
 describe("application startup and routes", () => {
@@ -122,6 +143,32 @@ describe("application startup and routes", () => {
     expect(repository.activeSaves).toHaveLength(0);
     expect(repository.active).toBe(checkpoint);
   });
+
+  it("shows zero without mutation, then lets the controller adjudicate timeout on command", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({
+      id: "restored-at-timeout",
+      timeControl: { initialMs: 1_000, kind: "sudden-death" },
+    });
+    controller.start(at(0));
+    repository.active = controller.exportCheckpoint();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "White to move" });
+    expect(screen.getByLabelText("White clock")).toHaveTextContent("0:00");
+    expect(repository.finalizations).toHaveLength(0);
+    expect(repository.active.lifecycle.phase).toBe("player-turn");
+
+    const board = currentBoardOptions();
+    act(() => {
+      expect(board.onPieceDrop?.({ sourceSquare: "e2", targetSquare: "e4" })).toBe(false);
+    });
+    await screen.findByRole("heading", { name: "Black won by timeout" });
+    expect(repository.finalizations).toHaveLength(1);
+    expect(repository.finalizations[0]?.checkpoint.history).toHaveLength(0);
+    expect(repository.active).toBeUndefined();
+    expect(screen.getByText(/White's time expired\. Black wins by timeout\./i)).toBeInTheDocument();
+  });
 });
 
 describe("setup flow", () => {
@@ -185,6 +232,51 @@ describe("setup flow", () => {
     );
     expect(gameRepository.activeSaves).toHaveLength(1);
     expect(gameRepository.activeSaves[0]?.lifecycle.phase).toBe("ready");
+  });
+
+  it("begins explicitly and submits e2e4 through the interactive shell", async () => {
+    const user = userEvent.setup();
+    const { gameRepository } = renderApp("/play/new");
+    await user.click(await screen.findByRole("button", { name: "Create Game" }));
+    await screen.findByRole("heading", { name: "Ready" });
+    expect(currentBoardOptions().allowDragging).toBe(false);
+    expect(currentBoardOptions()).not.toHaveProperty("onSquareClick");
+
+    await user.click(screen.getByRole("button", { name: "Begin Game" }));
+    await screen.findByRole("heading", { name: "White to move" });
+    expect(currentBoardOptions().allowDragging).toBe(true);
+
+    act(() => currentBoardOptions().onSquareClick?.({ square: "e2" }));
+    await waitFor(() => expect(screen.getByText(/2 legal destinations/i)).toBeInTheDocument());
+    act(() => currentBoardOptions().onSquareClick?.({ square: "e4" }));
+
+    await screen.findByRole("heading", { name: "Black to move" });
+    const history = screen.getByRole("heading", { name: "Move history" }).closest("section");
+    if (!history) throw new Error("Expected move-history section.");
+    expect(within(history).getByText("e4")).toBeVisible();
+    expect(currentBoardOptions().position).toContain(" b ");
+    expect(gameRepository.activeSaves).toHaveLength(3);
+    expect(gameRepository.activeSaves.at(-1)?.history[0]?.san).toBe("e4");
+    expect(screen.getByText(/White played e4\. Black to move\./i)).toBeInTheDocument();
+  });
+
+  it("locks duplicate Begin Game input while the authoritative start is saving", async () => {
+    const user = userEvent.setup();
+    const repository = new MemoryGameRepository();
+    renderApp("/play/new", repository);
+    await user.click(await screen.findByRole("button", { name: "Create Game" }));
+    await screen.findByRole("heading", { name: "Ready" });
+    const pending = createDeferred<GamePersistenceResult>();
+    repository.saveActiveImplementation = () => pending.promise;
+
+    await user.click(screen.getByRole("button", { name: "Begin Game" }));
+    const busy = screen.getByRole("button", { name: "Beginning..." });
+    expect(busy).toBeDisabled();
+    await user.click(busy);
+    expect(repository.activeSaves).toHaveLength(2);
+    pending.resolve({ status: "saved" });
+    await screen.findByRole("heading", { name: "White to move" });
+    expect(repository.activeSaves).toHaveLength(2);
   });
 
   it("prevents duplicate submission while creation is pending", async () => {

@@ -2,7 +2,7 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 const distDirectory = path.resolve("apps/web/dist");
 let server: Server | undefined;
@@ -58,7 +58,7 @@ async function serveBuiltApp(requestUrl: string, response: ServerResponse): Prom
   }
 }
 
-test("a fresh local game remains ready after creation and restoration", async ({ page }) => {
+test("a timed local game starts explicitly, plays, reloads, and continues", async ({ page }) => {
   await page.goto("/");
 
   await page.evaluate(
@@ -89,27 +89,51 @@ test("a fresh local game remains ready after creation and restoration", async ({
   await expect(page.getByRole("heading", { name: "Create a game" })).toBeVisible();
 
   await page.getByRole("radio", { name: /3 minutes \+ 2 seconds/i }).check();
-  await page.getByRole("radio", { name: /^Black$/i }).check();
-  await page.getByRole("checkbox", { name: /Allow undo/i }).uncheck();
   await page.getByRole("button", { name: "Create Game" }).click();
 
   await expect(page).toHaveURL(/\/play$/);
-  await expect(page.getByRole("heading", { name: "Ready" })).toBeVisible();
-  await expect(page.getByRole("img", { name: /Black orientation/i })).toBeVisible();
+  await expect(page.getByRole("heading", { exact: true, name: "Ready" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /White orientation/i })).toBeVisible();
   await expect(page.getByText(/game remains ready and no clock has been started/i)).toBeVisible();
   await expect(page.getByLabel("White clock")).toHaveText("3:00");
   await expect(page.getByLabel("Black clock")).toHaveText("3:00");
   await expect(page.getByText("3 + 2")).toBeVisible();
-  await expect(page.getByText("Disabled")).toBeVisible();
-  await expect(page.getByText("Active turn")).toHaveCount(0);
+
+  await page.locator("#caissa-game-board-square-e2").click();
+  await page.locator("#caissa-game-board-square-e4").click();
+  await expect(page.getByRole("heading", { exact: true, name: "Ready" })).toBeVisible();
+  await expect(page.locator(".move-list")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Begin Game" }).click();
+  await expect(page.getByRole("heading", { name: "White to move" })).toBeVisible();
+  await expect(page.getByText(/White to move\./).last()).toBeAttached();
+  await expect.poll(() => page.getByLabel("White clock").textContent()).not.toBe("3:00");
+
+  await page.locator("#caissa-game-board-square-e2").click();
+  await page.locator("#caissa-game-board-square-e4").click();
+  await expect(page.getByRole("heading", { name: "Black to move" })).toBeVisible();
+  await expect(page.locator(".move-list").getByText("e4")).toBeVisible();
+  await expect(page.getByText(/White played e4\. Black to move\./)).toBeAttached();
+  await expect.poll(() => page.getByLabel("Black clock").textContent()).not.toBe("3:00");
+  const blackBeforeReload = await clockSeconds(page.getByLabel("Black clock"));
 
   await page.reload();
 
-  await expect(page.getByRole("heading", { name: "Ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Black to move" })).toBeVisible();
   await expect(page.getByRole("img", { name: /White orientation/i })).toBeVisible();
-  await expect(page.getByLabel("White clock")).toHaveText("3:00");
-  await expect(page.getByLabel("Black clock")).toHaveText("3:00");
-  await expect(page.getByText("Active turn")).toHaveCount(0);
+  await expect(page.locator(".move-list").getByText("e4")).toBeVisible();
+  await expect
+    .poll(() => clockSeconds(page.getByLabel("Black clock")))
+    .toBeLessThanOrEqual(blackBeforeReload);
+
+  await page.locator("#caissa-game-board-square-e7").click();
+  await page.locator("#caissa-game-board-square-e5").click();
+  await expect(page.getByRole("heading", { name: "White to move" })).toBeVisible();
+  await expect(page.locator(".move-list").getByText("e4")).toBeVisible();
+  await expect(page.locator(".move-list").getByText("e5")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(
+    /timestamp-regression|illegal-move|transaction-failed|storage-unavailable/i,
+  );
 
   await page.setViewportSize({ height: 844, width: 390 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
@@ -118,10 +142,17 @@ test("a fresh local game remains ready after creation and restoration", async ({
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "White to move" })).toBeVisible();
   expect(
     await page
       .locator(".route-fade")
       .evaluate((element) => Number.parseFloat(getComputedStyle(element).animationDuration)),
   ).toBeLessThanOrEqual(0.001);
 });
+
+async function clockSeconds(locator: Locator): Promise<number> {
+  const value = (await locator.textContent()) ?? "";
+  const match = /^(\d+):(\d{2})$/u.exec(value);
+  if (!match) throw new Error(`Expected a clock value, received ${value}.`);
+  return Number(match[1]) * 60 + Number(match[2]);
+}
