@@ -1,4 +1,8 @@
-import { projectClockDisplay, type ClockDisplayProjectionResult } from "@caissa/chess-core";
+import {
+  parseSquare,
+  projectClockDisplay,
+  type ClockDisplayProjectionResult,
+} from "@caissa/chess-core";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ActiveGameRuntimeView } from "../../app/CaissaAppProvider";
 import { at, createControllerFixture, humanMove } from "../../test/application-service-test-kit";
 import { ActiveGameShell } from "./GameShellPage";
+import type { ActiveGameInteraction } from "./use-active-game-interaction";
 
 vi.mock("react-chessboard", () => ({ Chessboard: () => <div data-testid="board" /> }));
 
@@ -220,5 +225,49 @@ describe("ActiveGameShell", () => {
     );
     expect(screen.getByRole("heading", { name: "Abandoned" })).toBeVisible();
     expect(screen.queryByText("completed")).not.toBeInTheDocument();
+  });
+
+  it("renders promotion as a blocking explicit choice owned by the interaction facade", () => {
+    const controller = createControllerFixture({ fen: "7k/P7/8/8/8/8/8/7K w - - 0 1" });
+    controller.start(at(0));
+    const active = runtime(controller);
+    const cancelPromotion = vi.fn();
+    const interaction: ActiveGameInteraction = {
+      announcement: "Choose a piece for promotion.",
+      disabledReason: undefined,
+      feedback: "promotion-required",
+      interaction: {
+        choices: ["queen", "rook", "bishop", "knight"],
+        color: "white",
+        inputMethod: "keyboard",
+        source: parseSquare("a7"),
+        status: "promotion-required",
+        target: parseSquare("a8"),
+      },
+      isInteractive: false,
+      isStarting: false,
+      persistence: active.persistence,
+      session: active.session,
+      attemptMove: vi.fn(() => Promise.resolve(undefined)),
+      cancelPromotion,
+      choosePromotion: vi.fn(() => Promise.resolve(undefined)),
+      clearSelection: vi.fn(),
+      retryPersistence: vi.fn(() => Promise.resolve()),
+      selectSquare: vi.fn(() => Promise.resolve()),
+      startGame: vi.fn(() =>
+        Promise.resolve({ messageKey: "invalid-state", status: "rejected" } as const),
+      ),
+    };
+    render(
+      <ActiveGameShell
+        activeGame={active}
+        interaction={interaction}
+        onRetry={() => Promise.resolve("nothing-pending")}
+      />,
+    );
+    expect(screen.getByRole("dialog", { name: "Choose a promotion piece" })).toBeVisible();
+    expect(screen.getAllByText("Choose a promotion piece.").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("img", { name: /Read-only chessboard/i })).toBeVisible();
+    expect(screen.getByRole("note")).toHaveTextContent("read-only");
   });
 });

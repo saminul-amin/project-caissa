@@ -174,6 +174,183 @@ export const playGameShellFixtures = {
   ),
 } as const;
 
+export const playLegalMoveInteractionFixtures = {
+  initialPosition: interaction(
+    "interaction-initial-position",
+    "the standard initial position",
+    "twenty authoritative legal moves are available only after start",
+  ),
+  quietMoves: interaction(
+    "interaction-quiet-source",
+    "a source has non-capturing moves",
+    "quiet destinations use the legal-target marker",
+  ),
+  captures: interaction(
+    "interaction-capture-source",
+    "a source has a legal capture",
+    "capture destinations use a distinct ring marker",
+  ),
+  noLegalMoves: interaction(
+    "interaction-no-legal-moves",
+    "a square has no legal move",
+    "no command is submitted and calm feedback is shown",
+  ),
+  selectedSource: interaction(
+    "interaction-selected-source",
+    "a movable source is selected",
+    "the source and unique authoritative targets are exposed",
+  ),
+  legalDestination: interaction(
+    "interaction-legal-destination",
+    "a selected destination matches a legal candidate",
+    "one coordinator move command is submitted",
+  ),
+  illegalDestination: interaction(
+    "interaction-illegal-destination",
+    "a selected destination has no legal candidate",
+    "the authoritative position is unchanged",
+  ),
+  inCheck: interaction(
+    "interaction-in-check",
+    "the side to move is checked",
+    "the checked king remains distinct from legal targets",
+  ),
+  castling: interaction(
+    "interaction-castling",
+    "castling is legal in the authoritative position",
+    "the king move candidate is submitted without UI legality logic",
+  ),
+  enPassant: interaction(
+    "interaction-en-passant",
+    "an en-passant capture is legal",
+    "the candidate is treated as an authoritative capture target",
+  ),
+} as const;
+
+export const playPromotionFixtures = {
+  white: promotion(
+    "promotion-white",
+    "a White pawn reaches its promotion destination",
+    "White Queen, Rook, Bishop, and Knight choices are presented",
+  ),
+  black: promotion(
+    "promotion-black",
+    "a Black pawn reaches its promotion destination",
+    "Black piece presentation is used",
+  ),
+  queen: promotion(
+    "promotion-queen",
+    "Queen is explicitly selected",
+    "the authoritative move includes Queen promotion",
+  ),
+  rook: promotion(
+    "promotion-rook",
+    "Rook underpromotion is explicitly selected",
+    "the authoritative move includes Rook promotion",
+  ),
+  bishop: promotion(
+    "promotion-bishop",
+    "Bishop underpromotion is explicitly selected",
+    "the authoritative move includes Bishop promotion",
+  ),
+  knight: promotion(
+    "promotion-knight",
+    "Knight underpromotion is explicitly selected",
+    "the authoritative move includes Knight promotion",
+  ),
+  cancelled: promotion(
+    "promotion-cancelled",
+    "the promotion dialog is cancelled",
+    "no command is submitted and revision is unchanged",
+  ),
+} as const;
+
+export const playInteractiveSessionFixtures = {
+  readyUntimed: session(
+    "session-ready-untimed",
+    "an untimed game awaits explicit start",
+    "the board is a noninteractive preview",
+  ),
+  readyTimed: session(
+    "session-ready-timed",
+    "a timed game awaits explicit start",
+    "both clocks retain equal initial time",
+  ),
+  activeWhite: session(
+    "session-active-white",
+    "an active White human turn",
+    "White move input is enabled",
+  ),
+  activeBlack: session(
+    "session-active-black",
+    "an active Black human turn",
+    "Black move input is enabled",
+  ),
+  submitting: session(
+    "session-submitting",
+    "a human move command is in flight",
+    "duplicate board input is blocked",
+  ),
+  appliedSaved: session(
+    "session-applied-saved",
+    "a move is committed and durable",
+    "the board, SAN history, revision, and turn refresh together",
+  ),
+  appliedUnsaved: session(
+    "session-applied-unsaved",
+    "a move is committed but autosave fails",
+    "playable memory state remains authoritative with a warning",
+  ),
+  completedFinalized: session(
+    "session-completed-finalized",
+    "a terminal result is saved transactionally",
+    "the board is read-only and the active slot is clear",
+  ),
+  completedPending: session(
+    "session-completed-finalization-pending",
+    "terminal history finalization fails",
+    "the result stays authoritative and further input is blocked",
+  ),
+  paused: session(
+    "session-paused-interaction",
+    "a paused checkpoint restores",
+    "the board remains read-only with no resume control",
+  ),
+  degraded: session(
+    "session-degraded-interaction",
+    "a degraded checkpoint restores",
+    "the board remains read-only",
+  ),
+  abandoned: session(
+    "session-abandoned-interaction",
+    "an abandoned checkpoint restores",
+    "the final position remains read-only",
+  ),
+} as const;
+
+export const playClockContinuityFixtures = {
+  runningBeforeReload: clock(
+    "clock-running-before-reload",
+    "a timed game persists a running clock",
+    "the absolute monotonic-compatible timestamp is checkpointed",
+  ),
+  restoredLaterOrigin: clock(
+    "clock-restored-later-origin",
+    "a new document has a later performance time origin",
+    "projected downtime is deducted without timestamp regression",
+  ),
+  exactTimeout: clock(
+    "clock-exact-timeout",
+    "elapsed time equals the remaining time",
+    "display reaches zero without mutating the session",
+  ),
+  expiredBeforeMove: clock(
+    "clock-expired-before-move",
+    "the active clock expired while the page was not commanding",
+    "the next authoritative command completes by timeout without the move",
+  ),
+} as const;
+
 function startup(id: string, description: string, expected: string) {
   return fixture(id, description, expected, "document startup-gate presentation");
 }
@@ -184,6 +361,22 @@ function setup(id: string, description: string, expected: string) {
 
 function shell(id: string, description: string, expected: string) {
   return fixture(id, description, expected, "document read-only game-shell presentation");
+}
+
+function interaction(id: string, description: string, expected: string) {
+  return fixture(id, description, expected, "document authoritative board interaction behavior");
+}
+
+function promotion(id: string, description: string, expected: string) {
+  return fixture(id, description, expected, "document explicit promotion behavior");
+}
+
+function session(id: string, description: string, expected: string) {
+  return fixture(id, description, expected, "document interactive session presentation");
+}
+
+function clock(id: string, description: string, expected: string) {
+  return fixture(id, description, expected, "document cross-navigation clock behavior");
 }
 
 function fixture(

@@ -1,8 +1,12 @@
+import { useRef } from "react";
 import { Link } from "react-router-dom";
 import type { ClockDurationMs, MoveRecord, Square } from "@caissa/chess-core";
 
 import { useCaissaApp } from "../../app/CaissaAppProvider";
+import { moveFeedbackMessage, projectBoardSelection } from "./board-interaction";
 import { ChessBoardAdapter } from "./components/ChessBoardAdapter";
+import { KeyboardChessBoard } from "./components/KeyboardChessBoard";
+import { PromotionDialog } from "./components/PromotionDialog";
 import {
   createMoveHistoryRows,
   createPlayerPanelModel,
@@ -10,10 +14,14 @@ import {
   timeControlLabel,
 } from "./game-shell-projections";
 import { createPiecePositionSummary } from "./position-summary";
+import {
+  useActiveGameInteraction,
+  type ActiveGameInteraction,
+} from "./use-active-game-interaction";
 import { useClockDisplay } from "./use-clock-display";
 
 export function GameShellPage() {
-  const { actions, activeGame } = useCaissaApp();
+  const { activeGame } = useCaissaApp();
   if (!activeGame) {
     return (
       <section className="state-card route-fade" aria-labelledby="empty-game-title">
@@ -27,38 +35,86 @@ export function GameShellPage() {
     );
   }
 
+  return <ActiveGameShellContainer activeGame={activeGame} />;
+}
+
+function ActiveGameShellContainer({
+  activeGame,
+}: {
+  readonly activeGame: NonNullable<ReturnType<typeof useCaissaApp>["activeGame"]>;
+}) {
+  const interaction = useActiveGameInteraction(activeGame);
   return (
     <ActiveGameShell
       activeGame={activeGame}
-      onRetry={() => actions.retryCurrentGamePersistence()}
+      interaction={interaction}
+      onRetry={() => interaction.retryPersistence()}
     />
   );
 }
 
 interface ActiveGameShellProps {
   readonly activeGame: NonNullable<ReturnType<typeof useCaissaApp>["activeGame"]>;
-  readonly onRetry: () => Promise<"failed" | "nothing-pending" | "succeeded">;
+  readonly interaction?: ActiveGameInteraction;
+  readonly onRetry: () => Promise<unknown>;
 }
 
-export function ActiveGameShell({ activeGame, onRetry }: ActiveGameShellProps) {
+export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGameShellProps) {
   const { session } = activeGame;
+  const statusRef = useRef<HTMLHeadingElement>(null);
   const clock = useClockDisplay(activeGame);
   const lastMove = session.history.at(-1);
   const status = gameStatusLabel(session);
   const white = createPlayerPanelModel("white", session.configuration.participants.white, session);
   const black = createPlayerPanelModel("black", session.configuration.participants.black, session);
+  const boardSelection = projectBoardSelection(interaction?.interaction ?? { status: "idle" });
+  const isSubmitting = interaction?.interaction.status === "submitting";
+
+  const beginGame = async () => {
+    if (!interaction) return;
+    const result = await interaction.startGame();
+    if (result.status === "applied") statusRef.current?.focus();
+  };
 
   return (
     <section className="game-shell route-fade" aria-labelledby="game-status-title">
       <header className="game-shell-heading">
         <div>
-          <p className="eyebrow">Local game · Read-only preview</p>
-          <h1 id="game-status-title">{status}</h1>
+          <p className="eyebrow">Local human game</p>
+          <h1 id="game-status-title" ref={statusRef} tabIndex={-1}>
+            {status}
+          </h1>
         </div>
         <p className="game-id">Game {String(session.gameId)}</p>
       </header>
 
       <PersistenceStatus persistence={activeGame.persistence} onRetry={onRetry} />
+
+      {session.lifecycle.phase === "ready" && interaction ? (
+        <section className="begin-game-panel" aria-labelledby="begin-game-title">
+          <div>
+            <h2 id="begin-game-title">Ready when you are</h2>
+            <p>
+              This game remains ready and no clock has been started. The board is a preview until
+              you begin.
+            </p>
+          </div>
+          <button
+            className="button button-primary"
+            disabled={interaction.isStarting}
+            onClick={() => void beginGame()}
+            type="button"
+          >
+            {interaction.isStarting ? "Beginning..." : "Begin Game"}
+          </button>
+        </section>
+      ) : null}
+
+      {interaction?.feedback ? (
+        <p className="move-feedback" role="status">
+          {moveFeedbackMessage(interaction.feedback)}
+        </p>
+      ) : null}
 
       <div className="game-layout">
         <aside className="game-side game-players" aria-label="Players and game status">
@@ -88,17 +144,43 @@ export function ActiveGameShell({ activeGame, onRetry }: ActiveGameShellProps) {
         </aside>
 
         <div className="board-column">
-          <ChessBoardAdapter
-            ariaLabel={`Read-only chessboard, ${capitalize(activeGame.orientation)} orientation`}
-            fen={session.position.fen}
-            isInCheck={session.position.inCheck}
-            {...(lastMove ? { lastMove: moveSquares(lastMove) } : {})}
-            orientation={activeGame.orientation}
-            turn={session.position.turn}
-          />
-          <p className="read-only-notice" role="note">
-            This position is read-only. Move interaction and game controls arrive in the next play
-            milestone; this game remains ready and no clock has been started.
+          <div className="interactive-board-stack">
+            <ChessBoardAdapter
+              ariaLabel={`${interaction?.isInteractive ? "Interactive" : "Read-only"} chessboard, ${capitalize(activeGame.orientation)} orientation`}
+              captureTargets={boardSelection.captureTargets}
+              fen={session.position.fen}
+              interactive={interaction?.isInteractive ?? false}
+              isInCheck={session.position.inCheck}
+              {...(lastMove ? { lastMove: moveSquares(lastMove) } : {})}
+              legalTargets={boardSelection.legalTargets}
+              onMoveIntent={(intent) => void interaction?.attemptMove(intent)}
+              onSquareActivate={(square, inputMethod) =>
+                void interaction?.selectSquare(square, inputMethod)
+              }
+              orientation={activeGame.orientation}
+              {...(boardSelection.selectedSource
+                ? { selectedSource: boardSelection.selectedSource }
+                : {})}
+              turn={session.position.turn}
+            />
+            {interaction ? (
+              <KeyboardChessBoard
+                disabled={!interaction.isInteractive}
+                fen={session.position.fen}
+                legalTargets={boardSelection.legalTargets}
+                onActivate={(square) => void interaction.selectSquare(square, "keyboard")}
+                onClearSelection={interaction.clearSelection}
+                orientation={activeGame.orientation}
+                selectedSource={boardSelection.selectedSource}
+              />
+            ) : null}
+          </div>
+          <p className="board-guidance" role="note">
+            {isSubmitting
+              ? "Committing your move..."
+              : interaction?.isInteractive
+                ? "Move by drag, click or tap a source and destination, or use the keyboard board."
+                : (interaction?.disabledReason ?? "This position is read-only.")}
           </p>
         </div>
 
@@ -107,6 +189,21 @@ export function ActiveGameShell({ activeGame, onRetry }: ActiveGameShellProps) {
           <PositionCompanion activeGame={activeGame} />
         </aside>
       </div>
+
+      {interaction?.interaction.status === "promotion-required" ? (
+        <PromotionDialog
+          choices={interaction.interaction.choices}
+          color={interaction.interaction.color}
+          onCancel={interaction.cancelPromotion}
+          onChoose={(piece) => void interaction.choosePromotion(piece)}
+        />
+      ) : null}
+
+      {interaction ? (
+        <p aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+          {interaction.announcement}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -146,10 +243,10 @@ function MoveHistory({ history }: { readonly history: readonly MoveRecord[] }) {
             <li key={row.moveNumber}>
               <span>{row.moveNumber}.</span>
               <span className={row.white === history.at(-1) ? "is-current" : undefined}>
-                {row.white?.san ?? "—"}
+                {row.white?.san ?? "-"}
               </span>
               <span className={row.black === history.at(-1) ? "is-current" : undefined}>
-                {row.black?.san ?? "—"}
+                {row.black?.san ?? "-"}
               </span>
             </li>
           ))}
@@ -203,7 +300,7 @@ function PersistenceStatus({
   if (persistence.status === "saving" || persistence.status === "retrying") {
     return (
       <p className="persistence-status" role="status">
-        Saving this game locally…
+        {"Saving this game locally\u2026"}
       </p>
     );
   }

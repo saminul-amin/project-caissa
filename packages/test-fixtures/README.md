@@ -60,6 +60,10 @@ The play-experience fixture module documents:
 - Restoring, empty, restored, recovery-required, unavailable, and failed startup presentation
 - Every approved setup choice plus replacement, validation, and persistence outcomes
 - Ready, active, paused, waiting, degraded, terminal, persistence-warning, and move-history shells
+- Legal source selection, quiet targets, captures, invalid destinations, castling, and en passant
+- White and Black promotion, every promotion piece, and cancellation
+- Active, submitting, saved, unsaved, finalized, and finalization-pending sessions
+- Cross-navigation running clocks, later time origins, and exact timeout boundaries
 
 Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persisted
 migration databases, and guided-review evidence.
