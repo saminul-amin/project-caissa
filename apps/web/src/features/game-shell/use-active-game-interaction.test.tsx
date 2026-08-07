@@ -505,6 +505,9 @@ function createActions(
   } = {},
 ): CaissaAppActions {
   return {
+    abandonCurrentGame: vi.fn<CaissaAppActions["abandonCurrentGame"]>(() =>
+      Promise.resolve({ control: "abandon", messageKey: "invalid-state", status: "rejected" }),
+    ),
     confirmActiveGameReplacement: vi.fn<CaissaAppActions["confirmActiveGameReplacement"]>(() =>
       Promise.resolve({ status: "created" }),
     ),
@@ -515,8 +518,17 @@ function createActions(
     discardActiveGame: vi.fn<CaissaAppActions["discardActiveGame"]>(() =>
       Promise.resolve("discarded"),
     ),
+    pauseCurrentGame: vi.fn<CaissaAppActions["pauseCurrentGame"]>(() =>
+      Promise.resolve({ control: "pause", messageKey: "invalid-state", status: "rejected" }),
+    ),
     readCurrentLegalMoves: vi.fn<CaissaAppActions["readCurrentLegalMoves"]>((query) =>
       controller.getLegalMoves(query),
+    ),
+    restartCurrentGame: vi.fn<CaissaAppActions["restartCurrentGame"]>(() =>
+      Promise.resolve({ control: "restart", messageKey: "invalid-state", status: "rejected" }),
+    ),
+    resumeCurrentGame: vi.fn<CaissaAppActions["resumeCurrentGame"]>(() =>
+      Promise.resolve({ control: "resume", messageKey: "invalid-state", status: "rejected" }),
     ),
     retryCurrentGamePersistence: vi.fn<CaissaAppActions["retryCurrentGamePersistence"]>(() =>
       Promise.resolve("succeeded"),
@@ -540,6 +552,9 @@ function createActions(
             status: "failed",
           } as const),
       ),
+    ),
+    undoCurrentGameMoves: vi.fn<CaissaAppActions["undoCurrentGameMoves"]>(() =>
+      Promise.resolve({ control: "undo-one", messageKey: "invalid-state", status: "rejected" }),
     ),
   };
 }

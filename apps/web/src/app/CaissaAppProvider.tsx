@@ -14,6 +14,7 @@ import {
   type GameSession,
   type LegalMove,
   type LegalMoveQuery,
+  type UndoPlyCount,
 } from "@caissa/chess-core";
 
 import {
@@ -26,14 +27,21 @@ import {
   type RecoveryReadModel,
   type SessionPersistenceState,
   type GameSessionCoordinator,
+  type GameOperationResult,
 } from "../application";
 import {
   createBrowserCaissaApplication,
   type CaissaApplication,
 } from "../infrastructure/composition";
-import { mapMoveOperationResult, mapStartOperationResult } from "./game-runtime-results";
+import {
+  mapGameControlOperationResult,
+  mapMoveOperationResult,
+  mapStartOperationResult,
+} from "./game-runtime-results";
 import type {
+  GameControlUiResult,
   MoveSubmissionUiResult,
+  PendingGameControl,
   StartGameUiResult,
   SubmitCurrentHumanMoveCommand,
 } from "./game-runtime-results";
@@ -60,17 +68,22 @@ export type CreateGameActionResult =
   | { readonly status: "storage-unavailable" | "failed" };
 
 export interface CaissaAppActions {
+  readonly abandonCurrentGame: () => Promise<GameControlUiResult>;
   readonly confirmActiveGameReplacement: (setup: NewGameSetup) => Promise<CreateGameActionResult>;
   readonly continueWithoutRestoring: () => void;
   readonly createNewGame: (command: CreateNewGameCommand) => Promise<CreateGameActionResult>;
   readonly discardActiveGame: () => Promise<"discarded" | "failed">;
+  readonly pauseCurrentGame: () => Promise<GameControlUiResult>;
   readonly readCurrentLegalMoves: (query?: LegalMoveQuery) => readonly LegalMove[];
+  readonly restartCurrentGame: () => Promise<GameControlUiResult>;
+  readonly resumeCurrentGame: () => Promise<GameControlUiResult>;
   readonly retryCurrentGamePersistence: () => Promise<"nothing-pending" | "succeeded" | "failed">;
   readonly retryStartup: () => Promise<void>;
   readonly startCurrentGame: () => Promise<StartGameUiResult>;
   readonly submitCurrentHumanMove: (
     command: SubmitCurrentHumanMoveCommand,
   ) => Promise<MoveSubmissionUiResult>;
+  readonly undoCurrentGameMoves: (plies: UndoPlyCount) => Promise<GameControlUiResult>;
 }
 
 export interface CaissaAppContextValue {
@@ -125,6 +138,11 @@ export function CaissaAppProvider({
     runtimeRef.current = runtime;
   }, [runtime]);
 
+  const replaceRuntime = useCallback((next: RuntimeOwner | undefined) => {
+    runtimeRef.current = next;
+    setRuntime(next);
+  }, []);
+
   const restore = useCallback(
     async (useRecoveryService = false): Promise<void> => {
       const request = startupRequest.current + 1;
@@ -136,12 +154,12 @@ export function CaissaAppProvider({
       if (!mounted.current || startupRequest.current !== request) return;
 
       if (result.status === "restored") {
-        setRuntime({ coordinator: result.coordinator, orientation: "white" });
+        replaceRuntime({ coordinator: result.coordinator, orientation: "white" });
         setRuntimeVersion((value) => value + 1);
       }
       setStartup(toStartupView(result));
     },
-    [application],
+    [application, replaceRuntime],
   );
 
   useEffect(() => {
@@ -163,7 +181,7 @@ export function CaissaAppProvider({
     async (command: CreateNewGameCommand): Promise<CreateGameActionResult> => {
       const result = await application.newGameService.createGame(command);
       if (result.status === "created" || result.status === "created-unsaved") {
-        setRuntime({ coordinator: result.coordinator, orientation: result.orientation });
+        replaceRuntime({ coordinator: result.coordinator, orientation: result.orientation });
         setRuntimeVersion((value) => value + 1);
         return Object.freeze({ status: result.status });
       }
@@ -176,11 +194,56 @@ export function CaissaAppProvider({
       }
       return Object.freeze({ status: result.status });
     },
-    [application, restore],
+    [application, replaceRuntime, restore],
+  );
+
+  const runGameControl = useCallback(
+    async (
+      control: PendingGameControl,
+      invoke: (owner: RuntimeOwner) => Promise<GameOperationResult>,
+    ): Promise<GameControlUiResult> => {
+      const owner = runtimeRef.current;
+      if (!owner) {
+        return Object.freeze({
+          control,
+          messageKey: "no-active-game",
+          status: "failed",
+        });
+      }
+      if (pendingMutation.current === owner.coordinator) {
+        return Object.freeze({
+          control,
+          messageKey: "operation-in-progress",
+          status: "blocked",
+        });
+      }
+
+      pendingMutation.current = owner.coordinator;
+      try {
+        const result = await invoke(owner);
+        if (runtimeRef.current !== owner) {
+          return Object.freeze({
+            control,
+            messageKey: "position-changed",
+            status: "rejected",
+          });
+        }
+        setRuntimeVersion((value) => value + 1);
+        return mapGameControlOperationResult(control, result);
+      } finally {
+        if (pendingMutation.current === owner.coordinator) pendingMutation.current = undefined;
+      }
+    },
+    [],
   );
 
   const actions = useMemo<CaissaAppActions>(
     () => ({
+      abandonCurrentGame() {
+        return runGameControl("abandon", (owner) =>
+          owner.coordinator.abandon({ now: application.monotonicClock.now() }),
+        );
+      },
       confirmActiveGameReplacement(setup) {
         return createGame({
           replaceActiveGame: REPLACE_ACTIVE_GAME_CONFIRMATION,
@@ -189,7 +252,7 @@ export function CaissaAppProvider({
       },
       continueWithoutRestoring() {
         application.recoveryService.continueWithoutRestoring();
-        setRuntime(undefined);
+        replaceRuntime(undefined);
         setStartup({ status: "no-active-game" });
       },
       createNewGame(command) {
@@ -200,25 +263,44 @@ export function CaissaAppProvider({
           confirmation: DISCARD_ACTIVE_GAME_CONFIRMATION,
         });
         if (result.status !== "discarded") return "failed";
-        setRuntime(undefined);
+        replaceRuntime(undefined);
         setStartup({ status: "no-active-game" });
         return "discarded";
       },
       async retryCurrentGamePersistence() {
-        if (!runtime) return "nothing-pending";
-        const result = await runtime.coordinator.retryPersistence();
+        const owner = runtimeRef.current;
+        if (!owner) return "nothing-pending";
+        const result = await owner.coordinator.retryPersistence();
+        if (runtimeRef.current !== owner) return result.status;
         setRuntimeVersion((value) => value + 1);
         return result.status;
       },
+      pauseCurrentGame() {
+        return runGameControl("pause", (owner) =>
+          owner.coordinator.pause(application.monotonicClock.now()),
+        );
+      },
       readCurrentLegalMoves(query) {
-        return runtime?.coordinator.getLegalMoves(query) ?? Object.freeze([]);
+        return runtimeRef.current?.coordinator.getLegalMoves(query) ?? Object.freeze([]);
+      },
+      restartCurrentGame() {
+        return runGameControl("restart", (owner) =>
+          owner.coordinator.restart({
+            expectedRevision: owner.coordinator.getSession().revision,
+          }),
+        );
+      },
+      resumeCurrentGame() {
+        return runGameControl("resume", (owner) =>
+          owner.coordinator.resume(application.monotonicClock.now()),
+        );
       },
       retryStartup() {
         return restore(true);
       },
       async startCurrentGame() {
-        if (!runtime) return Object.freeze({ messageKey: "no-active-game", status: "failed" });
-        const owner = runtime;
+        const owner = runtimeRef.current;
+        if (!owner) return Object.freeze({ messageKey: "no-active-game", status: "failed" });
         if (pendingMutation.current === owner.coordinator) {
           return Object.freeze({
             messageKey: "operation-in-progress",
@@ -238,8 +320,8 @@ export function CaissaAppProvider({
         }
       },
       async submitCurrentHumanMove(command) {
-        if (!runtime) return Object.freeze({ messageKey: "no-active-game", status: "failed" });
-        const owner = runtime;
+        const owner = runtimeRef.current;
+        if (!owner) return Object.freeze({ messageKey: "no-active-game", status: "failed" });
         if (pendingMutation.current === owner.coordinator) {
           return Object.freeze({
             messageKey: "operation-in-progress",
@@ -262,8 +344,17 @@ export function CaissaAppProvider({
           if (pendingMutation.current === owner.coordinator) pendingMutation.current = undefined;
         }
       },
+      undoCurrentGameMoves(plies) {
+        return runGameControl(plies === 1 ? "undo-one" : "undo-two", (owner) =>
+          owner.coordinator.undoMoves({
+            expectedRevision: owner.coordinator.getSession().revision,
+            now: application.monotonicClock.now(),
+            plies,
+          }),
+        );
+      },
     }),
-    [application, createGame, restore, runtime],
+    [application, createGame, replaceRuntime, restore, runGameControl],
   );
 
   const activeGame = useMemo<ActiveGameRuntimeView | undefined>(() => {

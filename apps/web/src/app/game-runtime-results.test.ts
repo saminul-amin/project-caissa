@@ -1,10 +1,15 @@
-import { parseSessionRevision, type GameCommandRejectionReason } from "@caissa/chess-core";
+import {
+  parseSessionRevision,
+  parseUndoPlyCount,
+  type GameCommandRejectionReason,
+} from "@caissa/chess-core";
 import { describe, expect, it } from "vitest";
 
 import type { GameOperationResult } from "../application";
 import { at, createControllerFixture, humanMove } from "../test/application-service-test-kit";
 import {
   mapGameOperationRejectionReason,
+  mapGameControlOperationResult,
   mapMoveOperationResult,
   mapStartOperationResult,
 } from "./game-runtime-results";
@@ -186,7 +191,80 @@ describe("game runtime result mapping", () => {
       status: "completed",
     });
   });
+
+  it("maps pause, resume, undo, restart, and abandonment through bounded control results", () => {
+    const controller = createControllerFixture();
+    controller.start(at(1_000));
+    const paused = controller.pause(at(1_100));
+    if (paused.status !== "applied") throw new Error("Expected pause fixture.");
+    expect(mapGameControlOperationResult("pause", appliedOperation(paused))).toMatchObject({
+      control: "pause",
+      persistence: "saved",
+      resumePhase: "player-turn",
+      status: "applied",
+    });
+
+    const resumed = controller.resume(at(1_200));
+    if (resumed.status !== "applied") throw new Error("Expected resume fixture.");
+    expect(mapGameControlOperationResult("resume", appliedOperation(resumed))).toMatchObject({
+      resumedPhase: "player-turn",
+      status: "applied",
+    });
+
+    controller.submitHumanMove(humanMove("e2e4", 1_300, 3));
+    const undone = controller.undoMoves({
+      expectedRevision: controller.getSession().revision,
+      now: at(1_400),
+      plies: parseUndoPlyCount(1),
+    });
+    if (undone.status !== "applied") throw new Error("Expected undo fixture.");
+    expect(mapGameControlOperationResult("undo-one", appliedOperation(undone))).toMatchObject({
+      control: "undo-one",
+      removedPlies: 1,
+      reopened: false,
+      status: "applied",
+    });
+
+    const restarted = controller.restart({ expectedRevision: controller.getSession().revision });
+    if (restarted.status !== "applied") throw new Error("Expected restart fixture.");
+    expect(mapGameControlOperationResult("restart", appliedOperation(restarted))).toMatchObject({
+      control: "restart",
+      status: "applied",
+    });
+
+    const abandoned = controller.abandon({ now: at(1_500) });
+    if (abandoned.status !== "completed") throw new Error("Expected abandonment fixture.");
+    const operation: GameOperationResult = {
+      domainResult: abandoned,
+      events: abandoned.events,
+      persistence: { revision: abandoned.session.revision, status: "finalized" },
+      persistenceEvents: [],
+      result: abandoned.result,
+      session: abandoned.session,
+      status: "completed",
+    };
+    expect(mapGameControlOperationResult("abandon", operation)).toMatchObject({
+      control: "abandon",
+      expiredColor: undefined,
+      persistence: "finalized",
+      result: { status: "abandoned" },
+      status: "completed",
+    });
+  });
 });
+
+function appliedOperation(
+  domainResult: Extract<GameOperationResult, { status: "applied" }>["domainResult"],
+): GameOperationResult {
+  return {
+    domainResult,
+    events: domainResult.events,
+    persistence: { revision: domainResult.session.revision, status: "saved" },
+    persistenceEvents: [],
+    session: domainResult.session,
+    status: "applied",
+  };
+}
 
 const fixtureError = Object.freeze({
   code: "storage-unavailable" as const,
