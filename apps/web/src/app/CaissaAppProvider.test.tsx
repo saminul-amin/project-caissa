@@ -1,12 +1,17 @@
 import { StrictMode, useState } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { moveInputFromUci, parseMonotonicTimestampMs, parseUciMove } from "@caissa/chess-core";
+import {
+  moveInputFromUci,
+  parseMonotonicTimestampMs,
+  parseUciMove,
+  parseUndoPlyCount,
+} from "@caissa/chess-core";
 import { describe, expect, it, vi } from "vitest";
 
 import { CaissaAppProvider, useCaissaApp } from "./CaissaAppProvider";
-import { DEFAULT_NEW_GAME_SETUP } from "../application";
-import { retryableStorageError } from "../test/application-service-test-kit";
+import { DEFAULT_NEW_GAME_SETUP, type GamePersistenceResult } from "../application";
+import { createDeferred, retryableStorageError } from "../test/application-service-test-kit";
 import { createTestApplication } from "../test/caissa-app-test-kit";
 
 function Probe() {
@@ -163,6 +168,76 @@ describe("CaissaAppProvider", () => {
     expect(screen.getByTestId("revision")).toHaveTextContent("1");
     expect(screen.getByTestId("history-count")).toHaveTextContent("0");
   });
+
+  it("delegates pause, resume, bounded undo, restart, and unawarded abandonment", async () => {
+    const user = userEvent.setup();
+    let timestamp = 10_000;
+    const now = vi.fn(() => parseMonotonicTimestampMs((timestamp += 100)));
+    const { application, gameRepository } = createTestApplication(undefined, {
+      monotonicClock: { now },
+    });
+    render(
+      <CaissaAppProvider application={application}>
+        <InteractionProbe />
+      </CaissaAppProvider>,
+    );
+    await screen.findByText("no-active-game:none:0");
+    await user.click(screen.getByRole("button", { name: "Create fixture game" }));
+    await user.click(screen.getByRole("button", { name: "Start fixture game" }));
+    await user.click(screen.getByRole("button", { name: "Play e2 to e4" }));
+    await user.click(screen.getByRole("button", { name: "Play e7 to e5" }));
+    expect(screen.getByTestId("history-count")).toHaveTextContent("2");
+
+    await user.click(screen.getByRole("button", { name: "Pause fixture game" }));
+    await screen.findByText("no-active-game:paused:4");
+    expect(screen.getByTestId("result")).toHaveTextContent("applied:saved");
+
+    await user.click(screen.getByRole("button", { name: "Resume fixture game" }));
+    await screen.findByText("no-active-game:player-turn:5");
+    await user.click(screen.getByRole("button", { name: "Undo two fixture plies" }));
+    await screen.findByText("no-active-game:player-turn:6");
+    expect(screen.getByTestId("history-count")).toHaveTextContent("0");
+    expect(screen.getByTestId("turn")).toHaveTextContent("white");
+
+    await user.click(screen.getByRole("button", { name: "Restart fixture game" }));
+    await screen.findByText("no-active-game:ready:7");
+    expect(screen.getByTestId("history-count")).toHaveTextContent("0");
+    await user.click(screen.getByRole("button", { name: "Start fixture game" }));
+    await user.click(screen.getByRole("button", { name: "End fixture game" }));
+    await screen.findByText("no-active-game:abandoned:9");
+    expect(screen.getByTestId("result")).toHaveTextContent("completed:finalized");
+    expect(gameRepository.active).toBeUndefined();
+    expect(gameRepository.completed.values().next().value?.result).toEqual({
+      isDraw: false,
+      reason: "abandoned",
+      status: "abandoned",
+    });
+    expect(now).toHaveBeenCalled();
+  });
+
+  it("rejects a game control while another bounded mutation is still saving", async () => {
+    const user = userEvent.setup();
+    const { application, gameRepository } = createTestApplication();
+    render(
+      <CaissaAppProvider application={application}>
+        <InteractionProbe />
+      </CaissaAppProvider>,
+    );
+    await screen.findByText("no-active-game:none:0");
+    await user.click(screen.getByRole("button", { name: "Create fixture game" }));
+    await screen.findByText("no-active-game:ready:0");
+    const pendingSave = createDeferred<GamePersistenceResult>();
+    gameRepository.saveActiveImplementation = () => pendingSave.promise;
+
+    await user.click(screen.getByRole("button", { name: "Start fixture game" }));
+    await user.click(screen.getByRole("button", { name: "Pause fixture game" }));
+    expect(screen.getByTestId("result")).toHaveTextContent("blocked:operation-in-progress");
+    expect(screen.getByTestId("revision")).toHaveTextContent("0");
+
+    pendingSave.resolve({ status: "saved" });
+    await screen.findByText("no-active-game:player-turn:1");
+    expect(screen.getByTestId("history-count")).toHaveTextContent("0");
+  });
 });
 
 function InteractionProbe() {
@@ -189,6 +264,58 @@ function InteractionProbe() {
         type="button"
       >
         Create fixture game
+      </button>
+      <button
+        onClick={() => {
+          if (!activeGame) return;
+          void actions
+            .submitCurrentHumanMove({
+              expectedRevision: activeGame.session.revision,
+              move: moveInputFromUci(parseUciMove("e7e5")),
+            })
+            .then((outcome) => {
+              setResult(
+                outcome.status === "applied"
+                  ? `${outcome.status}:${outcome.persistence}`
+                  : `${outcome.status}:${"messageKey" in outcome ? outcome.messageKey : outcome.persistence}`,
+              );
+            });
+        }}
+        type="button"
+      >
+        Play e7 to e5
+      </button>
+      <button
+        onClick={() => void actions.pauseCurrentGame().then(showControlResult(setResult))}
+        type="button"
+      >
+        Pause fixture game
+      </button>
+      <button
+        onClick={() => void actions.resumeCurrentGame().then(showControlResult(setResult))}
+        type="button"
+      >
+        Resume fixture game
+      </button>
+      <button
+        onClick={() =>
+          void actions.undoCurrentGameMoves(parseUndoPlyCount(2)).then(showControlResult(setResult))
+        }
+        type="button"
+      >
+        Undo two fixture plies
+      </button>
+      <button
+        onClick={() => void actions.restartCurrentGame().then(showControlResult(setResult))}
+        type="button"
+      >
+        Restart fixture game
+      </button>
+      <button
+        onClick={() => void actions.abandonCurrentGame().then(showControlResult(setResult))}
+        type="button"
+      >
+        End fixture game
       </button>
       <button
         onClick={() => {
@@ -254,4 +381,16 @@ function InteractionProbe() {
       </button>
     </>
   );
+}
+
+function showControlResult(setResult: (value: string) => void) {
+  return (
+    outcome: Awaited<ReturnType<ReturnType<typeof useCaissaApp>["actions"]["pauseCurrentGame"]>>,
+  ) => {
+    setResult(
+      outcome.status === "applied" || outcome.status === "completed"
+        ? `${outcome.status}:${outcome.persistence}`
+        : `${outcome.status}:${outcome.messageKey}`,
+    );
+  };
 }
