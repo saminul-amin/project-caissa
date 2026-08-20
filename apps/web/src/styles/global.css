@@ -31,17 +31,30 @@
  * Painting from `body` keeps every themed value one level below where it is declared, which
  * is the resolution path the rest of the stylesheet already relies on.
  */
+/*
+ * The application owns its own scrolling.
+ *
+ * itch.io embeds an HTML5 project in an iframe with `scrolling="no"`, so a page that
+ * relies on the document scrolling leaves everything below the fold unreachable. Scrolling
+ * an element inside the document works in every host, embedded or not.
+ */
 html {
+  height: 100%;
   font-family: var(--font-ui);
 }
 
 body {
   min-width: 320px;
-  min-height: 100vh;
+  height: 100%;
   margin: 0;
-  overflow-x: hidden;
+  overflow: hidden;
   background: var(--color-bg-app);
   color: var(--color-text-primary);
+}
+
+/* The React root must carry the height chain, or the shell has nothing to fill. */
+#root {
+  height: 100%;
 }
 
 button,
@@ -102,7 +115,11 @@ h2 {
 .app-shell {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  min-height: 100vh;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .skip-link {
@@ -324,8 +341,9 @@ h2 {
 
 .startup-gate {
   display: grid;
-  min-height: 100vh;
+  height: 100%;
   padding: var(--space-4);
+  overflow-y: auto;
   place-items: center;
   background: var(--color-bg-app);
 }

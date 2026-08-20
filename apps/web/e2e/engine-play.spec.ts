@@ -196,3 +196,33 @@ async function resetDatabase(page: Page): Promise<void> {
       }),
   );
 }
+
+test("the app scrolls itself inside a non-scrolling iframe, as itch.io embeds it", async ({
+  page,
+}) => {
+  // itch.io serves HTML5 projects in an iframe with scrolling="no". A page that relies on
+  // the document scrolling loses everything below the fold there.
+  await page.setContent(
+    `<html><body style="margin:0">
+       <iframe src="${baseUrl}#/play/new" width="1280" height="800" scrolling="no"
+               style="border:0"></iframe>
+     </body></html>`,
+  );
+  const frame = page.frameLocator("iframe");
+  await expect(frame.getByRole("heading", { name: "Set up your game" })).toBeVisible();
+
+  const shell = frame.locator(".app-shell");
+  const metrics = await shell.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+
+  await shell.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  expect(await shell.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+
+  // The submit button lives below the fold; it must be reachable without a document scroll.
+  await expect(frame.getByRole("button", { name: "Create Game" })).toBeInViewport();
+});
