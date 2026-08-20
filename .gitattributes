@@ -1,7 +1,9 @@
 # Normalize repository text for reproducible cross-platform checkouts.
 * text=auto eol=lf
 
-# Keep common binary artifacts out of text normalization.
+# Keep common binary artifacts out of text normalization. The engine payload is pinned by
+# digest, so it must never depend on git's binary-detection heuristic.
+*.wasm binary
 *.gif binary
 *.ico binary
 *.jpg binary
