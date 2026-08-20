@@ -19,6 +19,7 @@ export default defineConfig({
         "src/application/game-session/**/*.ts",
         "src/application/history/**/*.ts",
         "src/application/opponent/**/*.ts",
+        "src/application/preferences/**/*.ts",
         "src/application/persistence/**/*.ts",
         "src/application/recovery/**/*.ts",
         "src/features/**/*.ts",

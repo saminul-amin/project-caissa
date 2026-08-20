@@ -16,6 +16,8 @@ import {
   type WallClock,
   type ActiveGameRecoveryService,
   type OpponentRuntime,
+  type PreferencesService,
+  createPreferencesService,
 } from "../../application";
 import { BrowserGameIdGenerator } from "../identity";
 import { BrowserRequestIdGenerator, createEngineOpponentRuntime } from "../opponent";
@@ -34,6 +36,7 @@ export interface CaissaApplication {
   readonly monotonicClock: MonotonicClock;
   readonly newGameService: NewGameService;
   readonly opponentRuntime: OpponentRuntime;
+  readonly preferencesService: PreferencesService;
   readonly recoveryService: ActiveGameRecoveryService;
   readonly startupService: GameStartupService;
   close(): void;
@@ -79,6 +82,9 @@ export function createCaissaApplication(
     wallClock: options.wallClock,
   });
 
+  const preferencesService = createPreferencesService({
+    preferencesRepository: options.preferencesRepository,
+  });
   const opponentRuntime =
     options.opponentRuntime ??
     createEngineOpponentRuntime({
@@ -99,6 +105,7 @@ export function createCaissaApplication(
     monotonicClock: options.monotonicClock,
     newGameService,
     opponentRuntime,
+    preferencesService,
     recoveryService,
     startupService,
   });

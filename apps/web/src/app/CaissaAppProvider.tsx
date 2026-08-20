@@ -30,6 +30,8 @@ import {
   type NewGameSetupField,
   type RecoveryReadModel,
   type SessionPersistenceState,
+  type UserPreferences,
+  DEFAULT_USER_PREFERENCES,
   type GameSessionCoordinator,
   type GameOperationResult,
 } from "../application";
@@ -85,7 +87,9 @@ export interface CaissaAppActions {
   readonly restartCurrentGame: () => Promise<GameControlUiResult>;
   readonly resumeCurrentGame: () => Promise<GameControlUiResult>;
   readonly retryCurrentGamePersistence: () => Promise<"nothing-pending" | "succeeded" | "failed">;
+  readonly resetPreferences: () => Promise<"failed" | "saved">;
   readonly retryOpponentTurn: () => Promise<void>;
+  readonly savePreferences: (preferences: UserPreferences) => Promise<"failed" | "saved">;
   readonly retryStartup: () => Promise<void>;
   readonly startCurrentGame: () => Promise<StartGameUiResult>;
   readonly submitCurrentHumanMove: (
@@ -99,6 +103,7 @@ export interface CaissaAppContextValue {
   readonly activeGame: ActiveGameRuntimeView | undefined;
   readonly application: CaissaApplication;
   readonly opponentStatus: OpponentRuntimeStatus;
+  readonly preferences: UserPreferences;
   readonly startup: AppStartupViewState;
 }
 
@@ -139,6 +144,7 @@ export function CaissaAppProvider({
   const [opponentStatus, setOpponentStatus] = useState<OpponentRuntimeStatus>(() =>
     application.opponentRuntime.getStatus(),
   );
+  const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_USER_PREFERENCES);
   const [runtime, setRuntime] = useState<RuntimeOwner | undefined>();
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   const mounted = useRef(false);
@@ -153,6 +159,15 @@ export function CaissaAppProvider({
 
   useEffect(() => application.opponentRuntime.subscribe(setOpponentStatus), [application]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void application.preferencesService.load().then((result) => {
+      if (!cancelled) setPreferences(result.preferences);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [application]);
 
   const replaceRuntime = useCallback(
     (next: RuntimeOwner | undefined) => {
@@ -383,8 +398,20 @@ export function CaissaAppProvider({
           owner.coordinator.resume(application.monotonicClock.now()),
         );
       },
+      async resetPreferences() {
+        const result = await application.preferencesService.reset();
+        if (result.status !== "saved") return "failed";
+        setPreferences(result.preferences);
+        return "saved";
+      },
       retryOpponentTurn() {
         return runOpponentTurn();
+      },
+      async savePreferences(next) {
+        const result = await application.preferencesService.save(next);
+        if (result.status !== "saved") return "failed";
+        setPreferences(result.preferences);
+        return "saved";
       },
       retryStartup() {
         return restore(true);
@@ -453,6 +480,7 @@ export function CaissaAppProvider({
     activeGame,
     application,
     opponentStatus,
+    preferences,
     startup,
   };
 

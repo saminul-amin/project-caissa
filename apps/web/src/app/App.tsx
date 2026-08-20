@@ -3,9 +3,11 @@ import { Route, Routes } from "react-router-dom";
 
 import { CaissaAppProvider, useCaissaApp } from "./CaissaAppProvider";
 import { AppShell } from "./AppShell";
+import { usePreferenceEffects } from "./use-preference-effects";
 import { GameSetupPage } from "../features/game-setup";
 import { HomePage } from "../features/home";
 import { RecoveryScreen } from "../features/recovery";
+import { SettingsPage } from "../features/settings";
 import type { CaissaApplication } from "../infrastructure/composition";
 import { NotFoundPage } from "../routes/NotFoundPage";
 import { PlaceholderPage } from "../routes/PlaceholderPage";
@@ -28,7 +30,8 @@ export function App({ application }: AppProps) {
 }
 
 function ApplicationGate() {
-  const { actions, startup } = useCaissaApp();
+  const { actions, preferences, startup } = useCaissaApp();
+  usePreferenceEffects(preferences);
   switch (startup.status) {
     case "restoring":
       return (
@@ -88,15 +91,7 @@ function ApplicationGate() {
                 />
               }
             />
-            <Route
-              path="/settings"
-              element={
-                <PlaceholderPage
-                  title="Settings"
-                  description="Application settings are not implemented yet."
-                />
-              }
-            />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </AppShell>

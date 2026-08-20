@@ -18,6 +18,7 @@ import {
   createDeferred,
   humanMove,
 } from "../../test/application-service-test-kit";
+import { DEFAULT_USER_PREFERENCES } from "../../application/settings";
 import {
   getGameInteractionEligibility,
   useActiveGameInteraction,
@@ -536,7 +537,9 @@ function createActions(
       Promise.resolve("succeeded"),
     ),
     exportCurrentGamePgn: vi.fn(() => '[Event "Caissa"]'),
+    resetPreferences: vi.fn<CaissaAppActions["resetPreferences"]>(() => Promise.resolve("saved")),
     retryOpponentTurn: vi.fn(() => Promise.resolve()),
+    savePreferences: vi.fn<CaissaAppActions["savePreferences"]>(() => Promise.resolve("saved")),
     retryStartup: vi.fn(() => Promise.resolve()),
     startCurrentGame: vi.fn<CaissaAppActions["startCurrentGame"]>(() =>
       Promise.resolve(
@@ -569,6 +572,7 @@ function installContext(actions: CaissaAppActions, activeGame: ActiveGameRuntime
     activeGame,
     application: {} as never,
     opponentStatus: { kind: "idle" },
+    preferences: DEFAULT_USER_PREFERENCES,
     startup: { status: "restored" },
   });
 }
