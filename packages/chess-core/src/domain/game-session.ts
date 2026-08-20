@@ -28,6 +28,11 @@ export type ParticipantKind = "external-opponent" | "human";
 export interface GameParticipant {
   readonly kind: ParticipantKind;
   readonly label?: string;
+  /**
+   * Opaque provider profile identity for external opponents. The domain never interprets
+   * it; it is carried so a restored game keeps the opponent it was created with.
+   */
+  readonly profile?: string;
 }
 
 export interface GameParticipants {
@@ -141,6 +146,7 @@ export interface RestartGameCommand {
 }
 
 const maximumParticipantLabelLength = 80;
+const participantProfilePattern = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
 /** Runtime-validates and freezes configuration supplied at the game-domain boundary. */
 export function createGameConfiguration(value: unknown): GameConfiguration {
@@ -193,8 +199,10 @@ function parseParticipant(value: unknown, colorLabel: string): GameParticipant {
     throw invalidConfiguration(`${colorLabel} participant kind is invalid.`);
   }
 
+  const profile = parseParticipantProfile(value.profile, colorLabel, value.kind);
+
   if (value.label === undefined) {
-    return Object.freeze({ kind: value.kind });
+    return Object.freeze({ kind: value.kind, ...(profile === undefined ? {} : { profile }) });
   }
 
   if (typeof value.label !== "string") {
@@ -210,7 +218,26 @@ function parseParticipant(value: unknown, colorLabel: string): GameParticipant {
     throw invalidConfiguration(`${colorLabel} participant label is invalid.`);
   }
 
-  return Object.freeze({ kind: value.kind, label });
+  return Object.freeze({
+    kind: value.kind,
+    label,
+    ...(profile === undefined ? {} : { profile }),
+  });
+}
+
+function parseParticipantProfile(
+  value: unknown,
+  colorLabel: string,
+  kind: ParticipantKind,
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (kind !== "external-opponent") {
+    throw invalidConfiguration(`${colorLabel} participant cannot declare an opponent profile.`);
+  }
+  if (typeof value !== "string" || !participantProfilePattern.test(value)) {
+    throw invalidConfiguration(`${colorLabel} participant profile is invalid.`);
+  }
+  return value;
 }
 
 function parseTimeControl(value: unknown): TimeControl {
