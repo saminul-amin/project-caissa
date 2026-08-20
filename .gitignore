@@ -7,6 +7,7 @@ venv/
 
 # Build and test output
 dist/
+dist-itch/
 build/
 coverage/
 htmlcov/
@@ -25,6 +26,7 @@ __pycache__/
 !.env.example
 
 # Editors and operating systems
+.claude/
 .idea/
 .vscode/
 .DS_Store
