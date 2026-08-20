@@ -22,6 +22,11 @@ const GameShellPage = lazy(async () => {
   return { default: feature.GameShellPage };
 });
 
+const ReviewPage = lazy(async () => {
+  const feature = await import("../features/review");
+  return { default: feature.ReviewPage };
+});
+
 export function App({ application }: AppProps) {
   return (
     <CaissaAppProvider {...(application ? { application } : {})}>
@@ -85,12 +90,29 @@ function ApplicationGate() {
               }
             />
             <Route path="/history" element={<HistoryPage />} />
+            <Route
+              path="/review/:gameId"
+              element={
+                <Suspense fallback={<ReviewRouteLoading />}>
+                  <ReviewPage />
+                </Suspense>
+              }
+            />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </AppShell>
       );
   }
+}
+
+function ReviewRouteLoading() {
+  return (
+    <section aria-busy="true" className="state-card route-fade">
+      <p className="eyebrow">Game review</p>
+      <h1>Opening the review</h1>
+    </section>
+  );
 }
 
 function PlayRouteLoading() {

@@ -6,4 +6,5 @@ export * from "./opponent";
 export * from "./persistence";
 export * from "./preferences";
 export * from "./recovery";
+export * from "./review";
 export * from "./settings";
