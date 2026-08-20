@@ -21,6 +21,26 @@ destination clears selection with calm feedback. A different movable source repl
 Promotion candidates come only from authoritative legal moves; cancellation returns to idle and
 does not submit.
 
+## Game controls
+
+`useActiveGameControls` is the bounded controls facade. It derives availability from immutable
+session, persistence, promotion, move-submission, confirmation, and pending-control state. It
+exposes pause/resume, explicit one- and two-ply undo, restart, and unawarded abandonment without
+exposing the coordinator, controller, rules adapter, or repository. The coordinator queue remains
+the mutation authority.
+
+Active-game undo is immediate. Undo from a completed result asks for confirmation; paused undo is
+unavailable until explicit resume. Restart and abandonment always ask for confirmation. Restart
+retains the same game identity, configuration, and orientation but returns to `ready`; it never
+auto-starts. Abandonment finalizes without awarding a winner and retains the current position and
+history. A pending command or confirmation locks board and sibling control input.
+
+The shared confirmation dialog has unique accessible names/descriptions, safe initial focus, a
+focus trap, Escape cancellation, and focus restoration. Successful control reconciliation clears
+selection, promotion, and prior move feedback, then focuses the authoritative status heading.
+Saved, unsaved, and finalization-pending outcomes have distinct copy. Retry repeats only the
+pending durable write.
+
 ## Accessibility and adapter isolation
 
 `components/ChessBoardAdapter.tsx` is the only production import of `react-chessboard`. It
@@ -51,5 +71,5 @@ corepack pnpm --filter @caissa/web test:coverage
 corepack pnpm test:e2e
 ```
 
-Pause/resume, undo, restart, abandonment, resignation, draw offers, external-opponent execution,
-Stockfish, Maia, and review controls are intentionally deferred.
+Resignation, draw offers, awarded-winner abandonment, external-opponent execution, Stockfish,
+Maia, and review controls are intentionally deferred.

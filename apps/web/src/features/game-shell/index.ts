@@ -2,6 +2,21 @@ export { GameShellPage, ActiveGameShell } from "./GameShellPage";
 export { ChessBoardAdapter, type ChessBoardAdapterProps } from "./components/ChessBoardAdapter";
 export { KeyboardChessBoard } from "./components/KeyboardChessBoard";
 export { PromotionDialog } from "./components/PromotionDialog";
+export { GameControlsPanel } from "./components/GameControlsPanel";
+export {
+  deriveGameControlsAvailability,
+  type GameControlAvailability,
+  type GameControlsAvailability,
+  type GameControlsAvailabilityInput,
+  type GameControlUnavailableReason,
+} from "./game-controls";
+export {
+  gameControlResultMessage,
+  useActiveGameControls,
+  type ActiveGameControls,
+  type GameControlConfirmation,
+  type GameControlFeedback,
+} from "./use-active-game-controls";
 export {
   createSourceSelection,
   moveFeedbackMessage,

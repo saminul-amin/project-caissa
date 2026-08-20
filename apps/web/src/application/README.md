@@ -27,6 +27,13 @@ not change session revision, events, clock, lifecycle, or persistence. Human mov
 the serialized `submitHumanMove` command with caller-supplied monotonic time and an expected
 revision. React receives only bounded safe results; it never receives the mutable coordinator.
 
+Pause, resume, one- or two-ply undo, restart, and abandonment use the same serialized command
+boundary. The provider supplies monotonic time and expected revisions, maps domain events into a
+safe control-result vocabulary, and omits `awardedWinner` from abandonment. A pending terminal
+finalization blocks reopening commands until its exact completed-record write succeeds. Active
+save failure remains distinct from command success; retry never repeats pause, resume, undo,
+restart, or abandonment.
+
 ## New-game creation
 
 `NewGameService` validates untrusted setup values, checks the active slot through `GameRepository`,

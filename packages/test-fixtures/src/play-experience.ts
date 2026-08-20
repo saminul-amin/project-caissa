@@ -351,6 +351,141 @@ export const playClockContinuityFixtures = {
   ),
 } as const;
 
+export const playPauseResumeFixtures = {
+  activePause: control(
+    "controls-pause-active",
+    "an active timed game is paused",
+    "elapsed time is charged once and neither clock remains active",
+  ),
+  pauseTimeout: control(
+    "controls-pause-timeout",
+    "the active clock reaches zero at the pause timestamp",
+    "timeout completes and finalizes instead of producing a paused state",
+  ),
+  restoredPaused: control(
+    "controls-pause-restored",
+    "a paused checkpoint reloads",
+    "the stored resume phase and remaining times restore without auto-resume",
+  ),
+  explicitResume: control(
+    "controls-resume-explicit",
+    "the user resumes a paused game",
+    "the recorded side resumes from caller-supplied monotonic time",
+  ),
+  persistenceFailure: control(
+    "controls-pause-unsaved",
+    "pause succeeds while its active checkpoint save fails",
+    "paused memory state remains authoritative with a retryable warning",
+  ),
+} as const;
+
+export const playUndoControlFixtures = {
+  onePly: control(
+    "controls-undo-one-ply",
+    "one active-game ply is undoable",
+    "one authoritative move is removed immediately",
+  ),
+  twoPly: control(
+    "controls-undo-two-plies",
+    "two active-game plies are undoable",
+    "both authoritative moves are removed as one command",
+  ),
+  completedConfirmation: control(
+    "controls-undo-completed-confirmation",
+    "a completed game has undoable history",
+    "confirmation is required before the result is cleared and the game reopens",
+  ),
+  pausedUnavailable: control(
+    "controls-undo-paused",
+    "a paused game has history",
+    "undo is unavailable with an instruction to resume first",
+  ),
+  disabledPolicy: control(
+    "controls-undo-disabled-policy",
+    "the immutable game configuration disables undo",
+    "both undo choices remain unavailable",
+  ),
+  insufficientHistory: control(
+    "controls-undo-insufficient-history",
+    "fewer plies exist than requested",
+    "the unavailable choice explains the history requirement",
+  ),
+} as const;
+
+export const playRestartControlFixtures = {
+  activeConfirmation: control(
+    "controls-restart-active-confirmation",
+    "an active game requests restart",
+    "confirmation precedes a same-ID reset to ready",
+  ),
+  completedConfirmation: control(
+    "controls-restart-completed-confirmation",
+    "a completed game requests restart",
+    "confirmation clears result, history, and clocks without auto-starting",
+  ),
+  pristineReady: control(
+    "controls-restart-pristine-ready",
+    "a game is already in its pristine ready state",
+    "restart is unavailable with a calm explanation",
+  ),
+  unsaved: control(
+    "controls-restart-unsaved",
+    "restart applies while active persistence fails",
+    "the fresh ready state remains active with a retryable warning",
+  ),
+} as const;
+
+export const playAbandonControlFixtures = {
+  confirmation: control(
+    "controls-abandon-confirmation",
+    "an active game requests abandonment",
+    "a destructive confirmation explains that no winner is awarded",
+  ),
+  finalized: control(
+    "controls-abandon-finalized",
+    "abandonment finalization succeeds",
+    "the current position and history move to completed storage with no winner",
+  ),
+  finalizationPending: control(
+    "controls-abandon-finalization-pending",
+    "abandonment is authoritative while finalization fails",
+    "the result remains and reopening controls stay blocked until durable retry",
+  ),
+  retry: control(
+    "controls-abandon-retry",
+    "pending abandonment finalization is retried",
+    "only the exact durable write repeats and the command revision does not change",
+  ),
+} as const;
+
+export const playGameControlUiFixtures = {
+  available: control(
+    "controls-ui-available",
+    "ordinary active play has no pending mutation",
+    "pause, eligible undo, restart, and abandonment controls are explicit",
+  ),
+  pending: control(
+    "controls-ui-pending",
+    "one control mutation is in flight",
+    "board input, promotion, and sibling controls are locked",
+  ),
+  unavailableReason: control(
+    "controls-ui-unavailable-reason",
+    "a lifecycle or policy makes a control unavailable",
+    "the control exposes a stable accessible explanation",
+  ),
+  confirmation: control(
+    "controls-ui-confirmation",
+    "a destructive or completed-game action needs confirmation",
+    "the named modal traps focus, starts safely, handles Escape, and restores focus",
+  ),
+  persistenceDistinction: control(
+    "controls-ui-persistence-distinction",
+    "a domain operation and its persistence have independent outcomes",
+    "saved, unsaved, and finalization-pending feedback remain distinct",
+  ),
+} as const;
+
 function startup(id: string, description: string, expected: string) {
   return fixture(id, description, expected, "document startup-gate presentation");
 }
@@ -377,6 +512,10 @@ function session(id: string, description: string, expected: string) {
 
 function clock(id: string, description: string, expected: string) {
   return fixture(id, description, expected, "document cross-navigation clock behavior");
+}
+
+function control(id: string, description: string, expected: string) {
+  return fixture(id, description, expected, "document bounded game-control behavior");
 }
 
 function fixture(

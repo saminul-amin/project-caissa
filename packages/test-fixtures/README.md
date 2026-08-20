@@ -64,6 +64,11 @@ The play-experience fixture module documents:
 - White and Black promotion, every promotion piece, and cancellation
 - Active, submitting, saved, unsaved, finalized, and finalization-pending sessions
 - Cross-navigation running clocks, later time origins, and exact timeout boundaries
+- Pause, reload, explicit resume, pause-timeout, and unsaved-pause outcomes
+- One- and two-ply undo, completed-game confirmation, and unavailable undo policies
+- Confirmed restart to ready, pristine-ready rejection, and unsaved restart
+- Unawarded abandonment, transactional finalization, pending finalization, and durable retry
+- Control availability, pending locks, accessible reasons, confirmation, and persistence feedback
 
 Future fixture categories include PGN games, Stockfish transcripts, Maia responses, persisted
 migration databases, and guided-review evidence.

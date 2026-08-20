@@ -6,6 +6,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import type { GameOperationResult } from "../application";
+import type { RejectedCoordinatorDomainResult } from "../application/game-session/game-session-types";
 import { at, createControllerFixture, humanMove } from "../test/application-service-test-kit";
 import {
   mapGameOperationRejectionReason,
@@ -97,6 +98,20 @@ describe("game runtime result mapping", () => {
       messageKey: "temporarily-unavailable",
       status: "failed",
     });
+    for (const control of [
+      "pause",
+      "resume",
+      "undo-one",
+      "undo-two",
+      "restart",
+      "abandon",
+    ] as const) {
+      expect(mapGameControlOperationResult(control, operation)).toEqual({
+        control,
+        messageKey: "temporarily-unavailable",
+        status: "failed",
+      });
+    }
   });
 
   it("maps rejection, blocked, and unexpected failure without raw errors", () => {
@@ -143,6 +158,11 @@ describe("game runtime result mapping", () => {
       messageKey: "persistence-pending",
       status: "blocked",
     });
+    expect(mapGameControlOperationResult("restart", blocked)).toEqual({
+      control: "restart",
+      messageKey: "persistence-pending",
+      status: "blocked",
+    });
 
     const failed: GameOperationResult = {
       error: { code: "unexpected-operation-failure", operation: "start", retryable: false },
@@ -157,6 +177,11 @@ describe("game runtime result mapping", () => {
       status: "failed",
     });
     expect(mapMoveOperationResult(failed)).toEqual({
+      messageKey: "temporarily-unavailable",
+      status: "failed",
+    });
+    expect(mapGameControlOperationResult("pause", failed)).toEqual({
+      control: "pause",
       messageKey: "temporarily-unavailable",
       status: "failed",
     });
@@ -189,6 +214,11 @@ describe("game runtime result mapping", () => {
       persistence: "finalized",
       result: { reason: "timeout" },
       status: "completed",
+    });
+    expect(mapGameControlOperationResult("restart", operation)).toEqual({
+      control: "restart",
+      messageKey: "temporarily-unavailable",
+      status: "failed",
     });
   });
 
@@ -251,6 +281,32 @@ describe("game runtime result mapping", () => {
       status: "completed",
     });
   });
+
+  it.each([
+    ["already-reset", "already-ready"],
+    ["already-paused", "game-paused"],
+    ["not-paused", "game-not-paused"],
+    ["game-paused", "resume-before-undo"],
+    ["undo-disabled", "undo-disabled"],
+    ["insufficient-history", "insufficient-history"],
+    ["stale-revision", "position-changed"],
+    ["position-mismatch", "position-changed"],
+    ["ply-mismatch", "position-changed"],
+    ["already-completed", "game-completed"],
+    ["already-abandoned", "game-completed"],
+    ["game-abandoned", "game-completed"],
+    ["internal-restoration-failure", "temporarily-unavailable"],
+    ["invalid-lifecycle", "invalid-state"],
+  ] satisfies readonly (readonly [RejectedCoordinatorDomainResult["reason"], string])[])(
+    "maps control rejection %s to safe key %s",
+    (reason, expected) => {
+      expect(mapGameControlOperationResult("undo-one", controlRejection(reason))).toEqual({
+        control: "undo-one",
+        messageKey: expected,
+        status: "rejected",
+      });
+    },
+  );
 });
 
 function appliedOperation(
@@ -263,6 +319,24 @@ function appliedOperation(
     persistenceEvents: [],
     session: domainResult.session,
     status: "applied",
+  };
+}
+
+function controlRejection(reason: RejectedCoordinatorDomainResult["reason"]): GameOperationResult {
+  const session = createControllerFixture().getSession();
+  const domainResult = {
+    events: [],
+    reason,
+    session,
+    status: "rejected",
+  } as RejectedCoordinatorDomainResult;
+  return {
+    domainResult,
+    events: [],
+    persistence: { status: "not-attempted" },
+    persistenceEvents: [],
+    session,
+    status: "rejected",
   };
 }
 
