@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 
 import { CaissaAppProvider, useCaissaApp } from "./CaissaAppProvider";
 import { AppShell } from "./AppShell";
+import { useMoveSounds } from "./use-move-sounds";
 import { usePreferenceEffects } from "./use-preference-effects";
 import { GameSetupPage } from "../features/game-setup";
 import { HistoryPage } from "../features/history";
@@ -30,8 +31,9 @@ export function App({ application }: AppProps) {
 }
 
 function ApplicationGate() {
-  const { actions, preferences, startup } = useCaissaApp();
+  const { actions, activeGame, preferences, startup } = useCaissaApp();
   usePreferenceEffects(preferences);
+  useMoveSounds({ preferences, session: activeGame?.session });
   switch (startup.status) {
     case "restoring":
       return (

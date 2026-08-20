@@ -24,6 +24,7 @@ export default defineConfig({
         "src/application/recovery/**/*.ts",
         "src/features/**/*.ts",
         "src/features/**/*.tsx",
+        "src/infrastructure/audio/**/*.ts",
         "src/infrastructure/composition/**/*.ts",
         "src/infrastructure/engine/**/*.ts",
         "src/infrastructure/identity/**/*.ts",
