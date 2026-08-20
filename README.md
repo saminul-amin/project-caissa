@@ -2,119 +2,137 @@
 
 > Beyond the Best Move
 
-Caissa is a browser-first, local-first, human-centered AI chess application. The product is intended to combine polished play, believable human-like opposition, objective analysis, and respectful post-game learning. This repository currently contains only the approved Phase 1 engineering foundation.
+Caissa is a browser-first, local-first chess application. You play a bounded, honest engine
+opponent, your games are saved in your own browser, and a guided review afterwards shows
+you the moments that actually decided the game.
 
-Chess gameplay, chess rules, a chessboard, Stockfish, Maia inference, persistence, game review, authentication, multiplayer, analytics, and production deployment are **not implemented yet**.
+Everything runs on your device. There are no accounts, no servers, and no analytics.
+
+## What Version 1 does
+
+- **Play the engine** at six named strengths, or play a local two-player game.
+- **Full legal chess** — castling, en passant, promotion, threefold repetition, the
+  fifty-move rule, insufficient material, stalemate, and checkmate.
+- **Clocks** with sudden-death and increment time controls, plus untimed play.
+- **Takebacks** for practice, pause and resume, restart, and a bounded end-game control.
+- **Save and resume** — an interrupted game is restored on your next visit.
+- **Game history** stored locally, with PGN export and deletion you control.
+- **Guided review** — evaluation curve, per-side accuracy, per-move classification, and the
+  key moments that changed the game, all computed locally by the bundled engine.
+- **Accessibility** — a keyboard-operable board, live announcements, visible focus, and a
+  reduced-motion preference.
+- **Offline after first load**, and packaged for itch.io as a self-contained HTML5 upload.
+
+Caissa never claims that a strength name equals a human rating, and never attributes intent
+to a move it did not calculate.
+
+## Licence
+
+Caissa is licensed **GPL-3.0-or-later**, because it distributes Stockfish. See `LICENSE`,
+`THIRD_PARTY_NOTICES.md`, and `docs/adr/0004-gpl-relicensing.md`.
 
 ## Monorepo structure
 
 ```text
 apps/
-  web/                 React, TypeScript, Vite, Router, and Tailwind shell
-  maia-service/        Health-only typed FastAPI service
+  web/                 React, TypeScript, and Vite application
+    public/engine/     Vendored single-threaded Stockfish WebAssembly build
+  maia-service/        Health-only FastAPI service, unreleased (see ADR-0003)
 packages/
-  chess-core/          Framework-independent domain package placeholder
-  shared-contracts/    Runtime-validated API contract foundation
+  chess-core/          Framework-independent chess domain: rules, clock, lifecycle, results
+  shared-contracts/    Runtime-validated API contracts
   design-tokens/       Semantic CSS variables
-  test-fixtures/       Future curated fixture inventory
-docs/                  Authoritative product and engineering specifications
-scripts/               Architecture, secret, and artifact checks
-tooling/               Reserved shared tooling boundary
-LICENSES/              Third-party license inventory foundation
-.github/workflows/     Pull-request quality gates
+  test-fixtures/       Curated cross-package fixtures
+docs/                  Product and engineering specifications, and ADRs
+scripts/               Architecture, secret, artifact, engine, and packaging checks
 ```
+
+Inside `apps/web/src`:
+
+```text
+app/            Composition of routes, providers, and cross-cutting effects
+application/    Use cases and ports: game creation, sessions, opponent, review, history
+features/       Screens; no persistence, transport, or chess authority
+infrastructure/ Adapters: engine, persistence, audio, identity, time, composition
+```
+
+Dependencies point inward. `chess-core` imports no framework, screens import no repository,
+and the chessboard library exists only behind one adapter file. `pnpm architecture:check`
+enforces this.
 
 ## Prerequisites
 
 - Node.js 24.12.0
 - pnpm 11.11.0 through Corepack
-- Python 3.13.x
-- uv 0.11.8
-
-The repository pins runtime identities in `.node-version`, `.nvmrc`, `.python-version`, `package.json`, and CI. Python 3.13 is the approved stable equivalent used for this foundation.
+- Python 3.13.x and uv 0.11.8, only for the unreleased service
 
 ## Installation
 
-Enable the pinned package manager and install the locked JavaScript workspace:
-
-```text
-corepack enable
-corepack prepare pnpm@11.11.0 --activate
-pnpm install --frozen-lockfile
+```bash
+corepack enable && corepack prepare pnpm@11.11.0 --activate && pnpm install --frozen-lockfile
 ```
 
-Synchronize the FastAPI service and development tools from the committed Python lockfile:
+## Development
 
-```text
-uv sync --frozen --project apps/maia-service
-```
-
-uv creates an ignored project virtual environment automatically. `pyproject.toml` remains the dependency declaration source and `apps/maia-service/uv.lock` freezes the complete resolution.
-
-## Development commands
-
-Run the web app and FastAPI service together:
-
-```text
-pnpm dev
-```
-
-Or run them independently:
-
-```text
+```bash
 pnpm --filter @caissa/web dev
-uv run --frozen --project apps/maia-service python -m uvicorn caissa_maia_service.main:app --app-dir apps/maia-service/src --reload
 ```
 
-The web app defaults to `http://127.0.0.1:5173`. The service defaults to `http://127.0.0.1:8000`, with health at `/api/v1/health`.
+The app runs at `http://127.0.0.1:5173`. The engine is fetched on the first opponent turn,
+not at page load, so a local two-player game never downloads it.
 
-## Quality and test commands
+## Quality commands
 
 ```text
-pnpm build               Build shared TypeScript packages and the web app
-pnpm lint                Lint TypeScript and Python
-pnpm format:check        Check Prettier and Ruff formatting
-pnpm typecheck           Run strict TypeScript checks
-pnpm test                Run TypeScript and Python unit tests
-pnpm test:e2e            Run the Playwright shell test
-pnpm architecture:check  Enforce import boundaries and reject cycles
-pnpm verify              Run the complete non-E2E quality gate
+pnpm verify               The complete non-E2E quality gate
+pnpm build                Build packages and the web application
+pnpm test                 TypeScript and Python unit tests with coverage thresholds
+pnpm test:e2e             Playwright browser tests
+pnpm typecheck            Strict TypeScript across every package
+pnpm lint                 ESLint and Ruff
+pnpm architecture:check   Import boundaries, layering rules, and cycle rejection
+pnpm engine:check         Verify the pinned digests of vendored third-party binaries
+pnpm licenses:check       Reject dependencies outside the permissive allowlist
+pnpm package:itch         Build and produce the itch.io upload archive
 ```
 
-Install Chromium once before the local E2E command:
+Install the browser once before the E2E command:
 
-```text
+```bash
 pnpm exec playwright install chromium
 ```
 
-Direct Python equivalents are:
+## Releasing to itch.io
 
-```text
-uv run --frozen --project apps/maia-service ruff check apps/maia-service
-uv run --frozen --project apps/maia-service ruff format --check apps/maia-service
-uv run --frozen --project apps/maia-service pytest apps/maia-service
+```bash
+pnpm package:itch
 ```
 
-## Architecture summary
+This produces `dist-itch/caissa-itch.zip` and `dist-itch/itch-manifest.json`. The script
+refuses to write an archive that breaks an itch.io packaging limit, and records the archive
+digest in the manifest.
 
-Caissa uses a browser-owned, local-first core with explicit boundaries around future infrastructure. Domain packages cannot import applications or UI frameworks. UI code cannot access persistence implementations directly. Feature code cannot call raw `fetch`. Dependency cycles are rejected. Future Stockfish and Maia integrations must remain replaceable advisers; neither will own authoritative game state.
+In the itch.io project settings:
 
-The FastAPI service is independently runnable and currently exposes only operational health. It has no Maia package, model download, worker pool, database, CORS middleware, authentication, or remote data retention.
+- Kind of project: **HTML**
+- Upload the archive and tick **This file will be played in the browser**
+- Embed: **Click to launch in fullscreen**
+- **Do not** enable the SharedArrayBuffer option; the bundled engine is single-threaded and
+  works without cross-origin isolation
+- Mobile friendly: **on**
 
-## Documentation reading order
+## Engine
 
-The complete authoritative suite is in `docs/`. New contributors should begin with:
+Caissa bundles Stockfish.js 18.0.8 (`lite-single`), a single-threaded WebAssembly build
+that needs SIMD but not `SharedArrayBuffer`. That choice is what lets one build work at a
+domain root, in a subdirectory, and inside an itch.io iframe. When a browser lacks the
+required capabilities, Caissa says so and offers local two-player play instead of failing
+quietly.
 
-1. `docs/00_product_indentity.md`
-2. `docs/01_prd.md`
-3. `docs/11_project_roadmap.md`
-4. `docs/09_coding_guidelines.md`
-5. `docs/05_architecture_design.md`
+See `docs/adr/0002-bundled-stockfish-single-thread.md`.
 
-For repository foundation work, also read technical specification 04, testing strategy 07, deployment specification 08, and security/privacy specification 10. `docs/README.md` contains the complete task-based reading guide.
+## Documentation
 
-## Current implementation status
-
-Phase 1 provides reproducible workspace configuration, a minimal accessible web shell, a typed service health boundary, shared contract and design-token foundations, testing tools, architecture enforcement, supply-chain checks, and pull-request CI.
-
-No Phase 2 or later product capability has been implemented. In particular, there is no chess gameplay, Stockfish integration, Maia inference, model file, review engine, authentication, multiplayer, database server, analytics service, or production deployment workflow.
+`docs/` holds the product and engineering specifications; `docs/README.md` is the index and
+the conflict-resolution order. Decisions that changed the approved plan are recorded in
+`docs/adr/`.

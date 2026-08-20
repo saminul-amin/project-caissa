@@ -2,8 +2,8 @@
 
 **Product:** Caissa  
 **Slogan:** Beyond the Best Move  
-**Documentation Status:** Approved for Implementation Planning  
-**Last Updated:** July 2026  
+**Documentation Status:** Approved; amended by the ADRs listed in section 8  
+**Last Updated:** August 2026  
 **Owner:** Md. Saminul Amin  
 
 ---
@@ -572,8 +572,7 @@ Version 1 requires:
 - Polished browser-based gameplay
 - Local two-player or practice support where approved
 - Stockfish-based local opponent
-- Maia-powered human-like opponent
-- Adjustable opponent profiles
+- Adjustable opponent profiles (Maia-powered opposition moved to Version 2 by ADR-0003)
 - Clocks
 - Move history
 - Undo in practice mode
@@ -582,7 +581,6 @@ Version 1 requires:
 - Local game history
 - Guided post-game review
 - Objective Stockfish analysis
-- Human-likelihood context
 - Responsive design
 - Accessibility baseline
 - Web release
@@ -590,6 +588,7 @@ Version 1 requires:
 
 Deferred:
 
+- Maia-powered human-like opponent and human-likelihood context (ADR-0003)
 - Authentication
 - Cloud synchronization
 - Online multiplayer
@@ -606,9 +605,7 @@ Deferred:
 
 # 7. Current Implementation Status
 
-Documentation is complete enough to begin implementation planning.
-
-Current status:
+Documentation is complete. Version 1 implementation is complete and packaged for release.
 
 | Area | Status |
 |---|---|
@@ -616,44 +613,68 @@ Current status:
 | Product requirements | Approved |
 | UX specification | Approved |
 | Design system | Approved |
-| Technical specification | Approved |
-| Architecture | Approved |
-| AI architecture | Approved |
+| Technical specification | Approved, amended by ADR-0002 and ADR-0003 |
+| Architecture | Approved, amended by ADR-0005 |
+| AI architecture | Approved, amended by ADR-0003 |
 | Testing strategy | Approved |
-| Deployment and release | Approved |
+| Deployment and release | Approved, amended by ADR-0004 and ADR-0005 |
 | Coding guidelines | Approved |
 | Security and privacy | Approved |
-| Project roadmap | Approved |
-| Repository implementation | Not started |
-| Chess core | Not started |
-| Stockfish | Not started |
-| Maia service | Not started |
-| Guided review | Not started |
-| Production deployment | Not started |
+| Project roadmap | Approved, resequenced by ADR-0003 |
+| Repository implementation | Complete |
+| Chess core | Complete |
+| Local persistence and recovery | Complete |
+| Play experience | Complete |
+| Stockfish integration | Complete (bundled, single-threaded) |
+| Opponent profiles | Complete |
+| Guided review | Complete |
+| Game history and settings | Complete |
+| Maia service | Deferred to Version 2 (ADR-0003) |
+| itch.io packaging | Complete |
 
-The next approved implementation phase is:
+## 7.1 What Changed Against the Approved Plan
 
-```text
-Phase 1 — Foundation and Repository Setup
-```
+Three approved decisions were amended during implementation. Each has an ADR that records
+the reason, the alternatives, and the consequences.
+
+1. **The remote Maia service is not in Version 1** (ADR-0003). A static itch.io release
+   cannot call a backend, and a required remote opponent would contradict the local-first
+   and offline promises in the PRD. Version 1 ships engine-backed opponent profiles behind
+   the same provider port, with honest strength labelling. `apps/maia-service` stays in the
+   repository, unreleased.
+
+2. **Stockfish is vendored and single-threaded** (ADR-0002). Threaded WebAssembly needs
+   cross-origin isolation that the embedding page controls, which §11.5 of the technical
+   specification already anticipated. The engine bytes are pinned by digest and verified in
+   the quality gate.
+
+3. **The project is GPL-3.0-or-later** (ADR-0004). Distributing Stockfish inside the
+   package requires it. This replaces the previous `UNLICENSED` declaration.
+
+Routing moved to hash-based URLs (ADR-0005) so one build works at a domain root, in a
+subdirectory, and inside an itch.io iframe.
+
+## 7.2 Deferred to Version 2
+
+- Remote Maia-3 service and human-like move prediction
+- Human-likelihood context in review
+- LLM explanation layer
+- Accounts, cloud sync, online multiplayer, social features, puzzles
 
 ---
 
 # 8. Architecture Decision Records
 
-Architecture decisions should be stored in:
+Architecture decisions are stored in `docs/adr/`. Where an ADR conflicts with a numbered
+specification document, the ADR wins and the specification is treated as amended.
 
-```text
-docs/adr/
-```
-
-Recommended format:
-
-```text
-0001-browser-first-local-core.md
-0002-maia-remote-service.md
-0003-stockfish-web-worker.md
-```
+| ADR | Decision |
+|---|---|
+| `0001-browser-first-local-core.md` | The browser owns authoritative game state |
+| `0002-bundled-stockfish-single-thread.md` | Vendored single-threaded Stockfish in a Web Worker |
+| `0003-engine-opponent-profiles-replace-maia-in-v1.md` | Engine profiles replace Maia in Version 1 |
+| `0004-gpl-relicensing.md` | The distributed work is GPL-3.0-or-later |
+| `0005-hash-routing-for-static-hosting.md` | Hash routing and relative asset paths |
 
 Each ADR should contain:
 
@@ -811,7 +832,8 @@ A task is complete when:
 
 # 14. Implementation Order
 
-The approved execution sequence is:
+The approved execution sequence was, and was followed except where ADR-0003 resequenced
+Maia out of Version 1:
 
 ```text
 1. Repository foundation

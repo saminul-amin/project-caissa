@@ -52,5 +52,12 @@ Caissa ships no font files, image files, sound files, or piece-image sets.
 - Typography uses locally available families with system fallbacks; no webfont is
   downloaded or redistributed.
 - Chess pieces are rendered by react-chessboard's built-in vector set.
+- Sound effects are synthesised at runtime with the Web Audio API
+  (`apps/web/src/infrastructure/audio`). No audio file is distributed.
+
+## Not distributed
+
+No Maia model, Maia package, or remote AI service artifact is distributed. See
+`docs/adr/0003-engine-opponent-profiles-replace-maia-in-v1.md`.
 
 This file is a compliance inventory. It is not legal advice.

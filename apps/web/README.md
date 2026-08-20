@@ -1,9 +1,19 @@
 # Caissa Web
 
 Caissa Web is the browser-first React, TypeScript, Vite, React Router, and Tailwind CSS v4
-application. The current play experience connects the verified chess domain and local persistence
-services to an accessible startup gate, local-game setup flow, and playable local
-human-versus-human shell.
+application. It connects the verified chess domain and local persistence services to an
+accessible startup gate, a setup flow, a playable board against the bundled engine or a second
+local player, game history with PGN export, settings, and a post-game review computed locally.
+
+New layers added beyond the play experience:
+
+- `infrastructure/engine` — Web Worker lifecycle, UCI protocol, cancellation, and capability
+  detection for the vendored Stockfish build. Nothing above this boundary parses engine text.
+- `application/opponent` — provider-agnostic opponent port, profile catalogue, and the turn
+  service that drives the coordinator through request, propose, and commit.
+- `application/review` — deterministic move assessment and the review pipeline, with results
+  cached in the analysis-cache repository and metadata recorded in the review repository.
+- `infrastructure/audio` — runtime-synthesised move cues; no audio file is distributed.
 
 ## Application ownership
 
@@ -61,13 +71,20 @@ zero without mutating the game, and lets the next authoritative command adjudica
 Persistence warnings remain distinct from chess outcomes and retry durability without replaying
 gameplay.
 
+The dedicated game-controls region exposes pause/resume, one- and two-ply undo, restart, and
+unawarded abandonment through bounded provider actions. Pause and resume use injected monotonic
+time. Active-game undo is immediate; completed-game undo, restart, and abandonment require an
+accessible confirmation. Restart preserves game identity and configuration but returns to
+`ready`, so play begins again only through `Begin Game`. A pending mutation locks board,
+promotion, and sibling controls, while persistence retry repeats only the durable write.
+
 ## Architecture boundaries
 
 - Features depend on the provider/facade and immutable read models, not Dexie, IndexedDB,
   repositories, chess.js, browser crypto, or performance APIs.
 - The setup feature asks `NewGameService` to create a game; it does not construct a controller.
-- The game shell uses only bounded legal-read, explicit-start, human-move, and persistence-retry
-  actions. It never receives the mutable coordinator.
+- The game shell uses only bounded legal-read, explicit-start, human-move, game-control, and
+  persistence-retry actions. It never receives the mutable coordinator.
 - No Zustand or other global-state library is used.
 
 ## Commands
@@ -82,6 +99,6 @@ corepack pnpm --filter @caissa/web build
 corepack pnpm test:e2e
 ```
 
-Pause/resume, undo, restart, abandonment, resignation, draw offers, external-opponent execution,
-Stockfish, Maia, guided review, authentication, multiplayer, analytics, cloud sync, and deployment
-are not implemented.
+Resignation, awarded-winner abandonment, draw offers, external-opponent execution, Stockfish,
+Maia, guided review, authentication, multiplayer, analytics, cloud sync, and deployment are not
+implemented.

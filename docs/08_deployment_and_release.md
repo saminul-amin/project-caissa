@@ -619,6 +619,10 @@ Do not compress already compressed formats unnecessarily.
 
 ## 13.4 SPA Routing
 
+> **Resolved by ADR-0005.** Caissa uses hash routing and relative asset paths, so no host
+> rewrite rule is required on any target.
+
+
 The host must route application paths to `index.html` while preserving real static assets.
 
 ## 13.5 Controlled Headers
@@ -638,6 +642,12 @@ Cross-origin-isolation headers should be enabled only after all required assets 
 ---
 
 # 14. itch.io HTML5 Packaging
+
+> **Implemented.** `pnpm package:itch` builds and validates the archive, writing
+> `dist-itch/caissa-itch.zip` and `dist-itch/itch-manifest.json`. The script enforces every
+> limit in §14.3 and fails rather than producing an invalid upload. SharedArrayBuffer must
+> stay disabled in the itch.io project settings; see ADR-0002.
+
 
 ## 14.1 Required Package Shape
 
@@ -1095,6 +1105,10 @@ The SBOM should be retained with release artifacts.
 # 24. License and Source Distribution
 
 ## 24.1 Stockfish
+
+> **Resolved by ADR-0004.** Caissa is GPL-3.0-or-later. See `LICENSE`,
+> `LICENSES/GPL-3.0.txt`, and `THIRD_PARTY_NOTICES.md`.
+
 
 Release packaging must preserve applicable GPL notices and corresponding-source obligations for the distributed browser engine build.
 

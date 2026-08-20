@@ -56,6 +56,33 @@ When roadmap decisions conflict with an approved specification, the specificatio
 
 ---
 
+# 2.1 Delivery Status — August 2026
+
+Version 1 is implemented and packaged. This roadmap is retained as the record of how the
+work was sequenced; where it disagrees with the ADRs in `docs/adr/`, the ADRs win.
+
+| Phase | Status |
+|---|---|
+| 1 — Foundation and repository setup | Complete |
+| 2 — Product design and interactive prototype | Complete |
+| 3 — Chess domain core | Complete |
+| 4 — Local persistence and recovery | Complete |
+| 5 — Play experience | Complete |
+| 6 — Stockfish integration | Complete (bundled, single-threaded; ADR-0002) |
+| 7 — Maia-3 service | Deferred to Version 2 (ADR-0003) |
+| 8 — Opponent calibration | Complete as engine profiles (ADR-0003) |
+| 9 — Guided review intelligence | Complete (Stockfish evidence; human-likelihood deferred) |
+| 10 — Accessibility and responsive polish | Complete |
+| 11 — Security, performance, and release engineering | Complete |
+| 12 — Beta validation | Ready to begin after the first itch.io upload |
+| 13 — Stable Version 1 release | Ready |
+
+Phase 7 was removed from Version 1 because a static itch.io release cannot depend on a
+remote service. The opponent port is provider-agnostic, so the Maia workstream resumes in
+Version 2 without reopening the game controller or any screen.
+
+---
+
 # 3. Product Direction
 
 Caissa is not being built as another generic chess website.
