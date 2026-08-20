@@ -16,7 +16,7 @@ export const APP_ROUTES = [
   {
     path: "/history",
     label: "History",
-    description: "Local game history has not been implemented yet.",
+    description: "Finished games saved in this browser.",
   },
   {
     path: "/settings",

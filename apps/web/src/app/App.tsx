@@ -5,12 +5,12 @@ import { CaissaAppProvider, useCaissaApp } from "./CaissaAppProvider";
 import { AppShell } from "./AppShell";
 import { usePreferenceEffects } from "./use-preference-effects";
 import { GameSetupPage } from "../features/game-setup";
+import { HistoryPage } from "../features/history";
 import { HomePage } from "../features/home";
 import { RecoveryScreen } from "../features/recovery";
 import { SettingsPage } from "../features/settings";
 import type { CaissaApplication } from "../infrastructure/composition";
 import { NotFoundPage } from "../routes/NotFoundPage";
-import { PlaceholderPage } from "../routes/PlaceholderPage";
 
 interface AppProps {
   readonly application?: CaissaApplication;
@@ -82,15 +82,7 @@ function ApplicationGate() {
                 </Suspense>
               }
             />
-            <Route
-              path="/history"
-              element={
-                <PlaceholderPage
-                  title="History"
-                  description="The history application service is ready, but the full history screen is not implemented yet."
-                />
-              }
-            />
+            <Route path="/history" element={<HistoryPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
