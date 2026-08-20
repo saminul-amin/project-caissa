@@ -3,6 +3,7 @@ import process from "node:process";
 
 const prohibited = [
   /(^|\/)dist\//u,
+  /(^|\/)dist-itch\//u,
   /(^|\/)coverage\//u,
   /(^|\/)node_modules\//u,
   /(^|\/)__pycache__\//u,

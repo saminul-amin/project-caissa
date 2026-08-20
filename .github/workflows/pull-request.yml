@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Foundation quality gates
+    name: Quality gates
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -70,6 +70,9 @@ jobs:
       - name: Scan for secrets
         run: pnpm scan:secrets
 
+      - name: Verify vendored engine assets
+        run: pnpm engine:check
+
       - name: Check production dependency licenses
         run: pnpm licenses:check
 
@@ -84,3 +87,13 @@ jobs:
 
       - name: Reject committed build artifacts
         run: pnpm artifacts:check
+
+      - name: Build the itch.io release package
+        run: node scripts/package-itch.mjs
+
+      - name: Upload the itch.io package
+        uses: actions/upload-artifact@v4
+        with:
+          name: caissa-itch-package
+          path: dist-itch/
+          retention-days: 14
