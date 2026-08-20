@@ -459,6 +459,10 @@ The main thread must never parse unbounded engine output synchronously.
 
 ## 11.3 Engine Port Selection
 
+> **Resolved by ADR-0002.** The selected distribution is Stockfish.js 18.0.8
+> (`stockfish-18-lite-single`), vendored at `apps/web/public/engine/`, pinned by SHA-256 in
+> `scripts/check-engine-assets.mjs`, and recorded in `THIRD_PARTY_NOTICES.md`.
+
 Use a maintained browser-compatible Stockfish WebAssembly distribution.
 
 Do not build new integration work on a deprecated compatibility repository when a maintained port exists.
@@ -571,6 +575,10 @@ The product must not claim that Stockfish engine levels correspond exactly to hu
 ---
 
 # 12. Maia-3 Integration
+
+> **Amended by ADR-0003.** Maia-3 is deferred to Version 2. Version 1 ships engine-backed
+> opponent profiles behind the same provider port. This section remains the approved design
+> for the Version 2 workstream.
 
 ## 12.1 Verified Capability Baseline
 

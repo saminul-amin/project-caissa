@@ -299,6 +299,11 @@ Stockfish must not own:
 
 # 9. Maia Model Strategy
 
+> **Amended by ADR-0003.** Sections 9 through 18 describe the Version 2 Maia workstream.
+> Version 1 ships engine-backed opponent profiles with honest strength labelling; no copy
+> in the product claims human-like move prediction.
+
+
 ## 9.1 Launch Model
 
 The initial production model candidate is:
@@ -1168,6 +1173,10 @@ All rules must be regression-tested.
 ---
 
 # 23. Human-Likelihood Insight
+
+> **Deferred to Version 2 by ADR-0003.** Version 1 review uses Stockfish evidence only and
+> makes no human-likelihood claim.
+
 
 ## 23.1 Purpose
 

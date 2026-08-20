@@ -1,3 +1,3 @@
 # Tooling
 
-Reserved for shared, repository-specific tooling configuration that becomes necessary in later phases. Phase 1 keeps active configuration at the repository root to avoid unnecessary indirection.
+Reserved for shared, repository-specific tooling configuration. Active configuration is kept at the repository root to avoid unnecessary indirection; nothing has yet needed to move here.

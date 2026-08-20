@@ -2,7 +2,16 @@
 
 Typed FastAPI foundation for Caissa's future Maia inference boundary.
 
-Phase 1 provides only `GET /api/v1/health`, validated startup configuration, and a stable error envelope. It does not include Maia-3, model files, python-chess, inference endpoints, a worker pool, remote persistence, authentication, analytics, or CORS middleware.
+> **Not part of Version 1.** Maia-3 opposition is deferred to Version 2 by
+> `docs/adr/0003-engine-opponent-profiles-replace-maia-in-v1.md`: a static itch.io release
+> cannot depend on a remote service, and a required backend would contradict Caissa's
+> local-first and offline promises. Version 1 ships engine-backed opponent profiles behind
+> the same provider port, so this service can be added later without reopening the game
+> controller or any screen.
+>
+> This service is not built, deployed, or called by the released application.
+
+It provides only `GET /api/v1/health`, validated startup configuration, and a stable error envelope. It does not include Maia-3, model files, python-chess, inference endpoints, a worker pool, remote persistence, authentication, analytics, or CORS middleware.
 
 ## Setup
 
