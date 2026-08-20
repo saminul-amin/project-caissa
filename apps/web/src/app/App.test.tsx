@@ -10,6 +10,7 @@ import {
   at,
   createControllerFixture,
   createDeferred,
+  humanMove,
   MemoryGameRepository,
 } from "../test/application-service-test-kit";
 import { createTestApplication } from "../test/caissa-app-test-kit";
@@ -76,16 +77,16 @@ describe("application startup and routes", () => {
       await screen.findByRole("heading", { name: "Play Chess Beyond the Best Move" }),
     ).toBeVisible();
     expect(screen.getByRole("link", { name: "Play a Game" })).toHaveAttribute("href", "/play/new");
-    expect(
-      screen.getByText(/AI opponents are described below but are not playable yet/i),
-    ).toBeVisible();
+    expect(screen.getByText(/Nothing you play is uploaded/i)).toBeVisible();
+    expect(screen.getByText(/not human ratings/i)).toBeVisible();
+    expect(screen.queryByText(/human-like/i)).not.toBeInTheDocument();
   });
 
   it("navigates from home to setup without creating a game", async () => {
     const user = userEvent.setup();
     const { gameRepository } = renderApp();
     await user.click(await screen.findByRole("link", { name: "Play a Game" }));
-    expect(await screen.findByRole("heading", { name: "Create a game" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Set up your game" })).toBeVisible();
     expect(gameRepository.activeSaves).toHaveLength(0);
   });
 
@@ -169,17 +170,293 @@ describe("application startup and routes", () => {
     expect(repository.active).toBeUndefined();
     expect(screen.getByText(/White's time expired\. Black wins by timeout\./i)).toBeInTheDocument();
   });
+
+  it("pauses and explicitly resumes a restored timed game without charging paused time", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({
+      id: "pause-resume-controls",
+      timeControl: { initialMs: 300_000, kind: "sudden-death" },
+    });
+    controller.start(at(0));
+    repository.active = controller.exportCheckpoint();
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "White to move" });
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+    expect(await screen.findByRole("heading", { name: "Paused" })).toHaveFocus();
+    expect(screen.getByLabelText("White clock")).toHaveTextContent("4:59");
+    expect(repository.active.lifecycle).toMatchObject({
+      phase: "paused",
+      resumePhase: "player-turn",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    expect(await screen.findByRole("heading", { name: "White to move" })).toHaveFocus();
+    expect(repository.active.clock).toMatchObject({ activeColor: "white", status: "running" });
+    expect(screen.getByText(/Game resumed\. White to move\. Saved locally\./i)).toBeVisible();
+  });
+
+  it("lets pause adjudicate an exact-boundary timeout through finalization", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({
+      id: "pause-timeout-controls",
+      timeControl: { initialMs: 1_000, kind: "sudden-death" },
+    });
+    controller.start(at(0));
+    repository.active = controller.exportCheckpoint();
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "White to move" });
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+    expect(await screen.findByRole("heading", { name: "Black won by timeout" })).toHaveFocus();
+    expect(screen.getByText(/White's time expired before the game could be paused/i)).toBeVisible();
+    expect(repository.finalizations).toHaveLength(1);
+    expect(repository.active).toBeUndefined();
+  });
+
+  it("keeps a successful pause authoritative when autosave fails and retries only persistence", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({ id: "pause-retry-controls" });
+    controller.start(at(0));
+    repository.active = controller.exportCheckpoint();
+    repository.saveActiveImplementation = () => ({
+      error: { code: "storage-unavailable", operation: "save-active-game", retryable: true },
+      status: "failed",
+    });
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "White to move" });
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+    await screen.findByRole("heading", { name: "Paused" });
+    expect(screen.getByRole("heading", { name: "Recent progress is not saved" })).toBeVisible();
+    expect(screen.getByText(/change is active but has not been saved locally/i)).toBeVisible();
+    const pauseRevision = repository.activeSaves.at(-1)?.revision;
+
+    repository.saveActiveImplementation = undefined;
+    await user.click(screen.getByRole("button", { name: "Retry Save" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("heading", { name: "Recent progress is not saved" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(repository.active.revision).toBe(pauseRevision);
+    expect(repository.active.lifecycle.phase).toBe("paused");
+  });
+
+  it("undoes active play immediately, confirms restart, and begins again only explicitly", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({ id: "undo-restart-controls" });
+    controller.start(at(0));
+    controller.submitHumanMove(humanMove("e2e4", 100));
+    repository.active = controller.exportCheckpoint();
+    const originalGameId = repository.active.gameId;
+    const originalConfiguration = repository.active.configuration;
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "Black to move" });
+    await user.click(screen.getByRole("button", { name: "Undo last move" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(await screen.findByText(/Undid the last move\. Saved locally\./i)).toBeVisible();
+    expect(screen.getByText(/No moves yet/i)).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Restart game" }));
+    const dialog = screen.getByRole("dialog", { name: "Restart this game?" });
+    await user.click(within(dialog).getByRole("button", { name: "Restart game" }));
+    expect(await screen.findByRole("heading", { name: "Ready" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Begin Game" })).toBeEnabled();
+    expect(screen.getByText(/Choose Begin Game when ready/i)).toBeVisible();
+    expect(repository.active.gameId).toBe(originalGameId);
+    expect(repository.active.configuration).toEqual(originalConfiguration);
+    expect(repository.active.clock.status).toBe("untimed");
+    expect(screen.getByRole("img", { name: /White orientation/i })).toBeVisible();
+  });
+
+  it("preserves an undone session across autosave failure and exact retry", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({ id: "undo-retry-controls" });
+    controller.start(at(0));
+    controller.submitHumanMove(humanMove("e2e4", 100));
+    repository.active = controller.exportCheckpoint();
+    repository.saveActiveImplementation = () => ({
+      error: { code: "storage-unavailable", operation: "save-active-game", retryable: true },
+      status: "failed",
+    });
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "Black to move" });
+    await user.click(screen.getByRole("button", { name: "Undo last move" }));
+    await screen.findByRole("heading", { name: "White to move" });
+    expect(screen.getByText(/No moves yet/i)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Recent progress is not saved" })).toBeVisible();
+    const undone = repository.activeSaves.at(-1);
+
+    repository.saveActiveImplementation = undefined;
+    await user.click(screen.getByRole("button", { name: "Retry Save" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("heading", { name: "Recent progress is not saved" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(repository.active).toBe(undone);
+    expect(repository.active.history).toHaveLength(0);
+    expect(repository.active.revision).toBe(3);
+  });
+
+  it("requires confirmation and finalizes abandonment without awarding a winner", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({ id: "abandon-controls" });
+    controller.start(at(0));
+    repository.active = controller.exportCheckpoint();
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "White to move" });
+    const trigger = screen.getByRole("button", { name: "End game" });
+    await user.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "End this game?" });
+    expect(dialog).toHaveTextContent("without awarding a winner");
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveFocus();
+    await user.click(trigger);
+    await user.click(
+      within(screen.getByRole("dialog", { name: "End this game?" })).getByRole("button", {
+        name: "End game",
+      }),
+    );
+
+    expect(await screen.findByRole("heading", { name: "Abandoned" })).toHaveFocus();
+    expect(
+      screen.getByText(/Game ended without awarding a winner\. Saved locally\./i),
+    ).toBeVisible();
+    expect(repository.active).toBeUndefined();
+    expect(repository.finalizations).toHaveLength(1);
+    expect(repository.finalizations[0]?.result).toEqual({
+      isDraw: false,
+      reason: "abandoned",
+      status: "abandoned",
+    });
+  });
+
+  it("keeps failed abandonment finalization separate and retries only the durable write", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({ id: "abandon-retry-controls" });
+    controller.start(at(0));
+    repository.active = controller.exportCheckpoint();
+    repository.finalizeImplementation = () => ({
+      error: { code: "storage-unavailable", operation: "finalize-game", retryable: true },
+      status: "failed",
+    });
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "White to move" });
+    await user.click(screen.getByRole("button", { name: "End game" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "End this game?" })).getByRole("button", {
+        name: "End game",
+      }),
+    );
+    await screen.findByRole("heading", { name: "Abandoned" });
+    expect(screen.getByRole("heading", { name: "History save is pending" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Restart game" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    const completedRevision = repository.finalizations[0]?.checkpoint.revision;
+
+    repository.finalizeImplementation = undefined;
+    await user.click(screen.getByRole("button", { name: "Retry Save" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("heading", { name: "History save is pending" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(repository.finalizations).toHaveLength(2);
+    expect(repository.finalizations[1]?.checkpoint.revision).toBe(completedRevision);
+    expect(screen.getByRole("heading", { name: "Abandoned" })).toBeVisible();
+  });
+
+  it("confirms undo before reopening a completed checkmate", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({ id: "completed-undo-controls" });
+    controller.start(at(0));
+    controller.submitHumanMove(humanMove("f2f3", 100));
+    controller.submitHumanMove(humanMove("e7e5", 200));
+    controller.submitHumanMove(humanMove("g2g4", 300));
+    repository.active = controller.exportCheckpoint();
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "Black to move" });
+    act(() => {
+      expect(currentBoardOptions().onPieceDrop?.({ sourceSquare: "d8", targetSquare: "h4" })).toBe(
+        false,
+      );
+    });
+    await screen.findByRole("heading", { name: "Black won by checkmate" });
+    await user.click(screen.getByRole("button", { name: "Undo last move" }));
+    const dialog = screen.getByRole("dialog", { name: "Reopen this completed game?" });
+    await user.click(within(dialog).getByRole("button", { name: "Reopen and undo move" }));
+
+    expect(await screen.findByRole("heading", { name: "Black to move" })).toHaveFocus();
+    expect(screen.getByText(/Completed game reopened\. Undid the last move/i)).toBeVisible();
+    expect(repository.active.result).toBeUndefined();
+    expect(repository.active.history).toHaveLength(3);
+  });
+
+  it("requires confirmation for completed-draw undo and cancellation changes nothing", async () => {
+    const repository = new MemoryGameRepository();
+    const controller = createControllerFixture({
+      fen: "7k/8/6K1/5Q2/8/8/8/8 w - - 0 1",
+      id: "completed-draw-undo-controls",
+    });
+    controller.start(at(0));
+    repository.active = controller.exportCheckpoint();
+    const user = userEvent.setup();
+    renderApp("/play", repository);
+
+    await screen.findByRole("heading", { name: "White to move" });
+    act(() => {
+      expect(currentBoardOptions().onPieceDrop?.({ sourceSquare: "f5", targetSquare: "f7" })).toBe(
+        false,
+      );
+    });
+    await screen.findByRole("heading", { name: "Draw by stalemate" });
+    const revision = repository.finalizations[0]?.checkpoint.revision;
+    await user.click(screen.getByRole("button", { name: "Undo last move" }));
+    expect(screen.getByRole("dialog", { name: "Reopen this completed game?" })).toBeVisible();
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Draw by stalemate" })).toBeVisible();
+    expect(repository.finalizations).toHaveLength(1);
+    expect(repository.finalizations[0]?.checkpoint.revision).toBe(revision);
+  });
 });
 
 describe("setup flow", () => {
-  it("renders accessible local setup and unavailable AI choices", async () => {
+  it("renders accessible opponent, strength, and honesty copy", async () => {
     renderApp("/play/new");
-    expect(await screen.findByRole("heading", { name: "Create a game" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Set up your game" })).toBeVisible();
     expect(screen.getByRole("radio", { name: /Local two-player/i })).toBeEnabled();
-    expect(screen.getByRole("radio", { name: /Human-like AI opponent/i })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: /Engine opponent/i })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /Play the engine/i })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Club/i })).toBeChecked();
+    expect(screen.getByText(/not human ratings/i)).toBeVisible();
     expect(screen.getByRole("button", { name: "Create Game" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Start Game" })).not.toBeInTheDocument();
+  });
+
+  it("hides strength options for a local two-player game", async () => {
+    const user = userEvent.setup();
+    renderApp("/play/new");
+    await user.click(await screen.findByRole("radio", { name: /Local two-player/i }));
+    expect(screen.queryByRole("radio", { name: /Club/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Board orientation" })).toBeVisible();
   });
 
   it("allows keyboard selection of time, undo, and orientation", async () => {
@@ -187,16 +464,16 @@ describe("setup flow", () => {
     renderApp("/play/new");
     const tenMinutes = await screen.findByRole("radio", { name: /10 minutes/i });
     await user.click(tenMinutes);
-    await user.click(screen.getByRole("checkbox", { name: /Allow undo/i }));
+    await user.click(screen.getByRole("checkbox", { name: /Allow takebacks/i }));
     await user.click(screen.getByRole("radio", { name: /Black/i }));
     expect(tenMinutes).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: /Allow undo/i })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Allow takebacks/i })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: /Black/i })).toBeChecked();
   });
 
   it("moves focus to an accessible summary for invalid external form state", async () => {
     renderApp("/play/new");
-    await screen.findByRole("heading", { name: "Create a game" });
+    await screen.findByRole("heading", { name: "Set up your game" });
     const localMode = screen.getByRole("radio", { name: /Local two-player/i });
     const timeControl = screen.getByRole("radio", { name: /^Untimed/i });
     fireEvent.change(localMode, { target: { checked: false } });
@@ -211,7 +488,7 @@ describe("setup flow", () => {
     fireEvent.submit(form);
     const summary = await screen.findByRole("alert");
     await waitFor(() => expect(summary).toHaveFocus());
-    expect(screen.getByRole("group", { name: "Game mode" })).toHaveAttribute(
+    expect(screen.getByRole("group", { name: "Opponent" })).toHaveAttribute(
       "aria-describedby",
       "mode-error",
     );
@@ -292,7 +569,13 @@ describe("setup flow", () => {
     renderApp("/play/new", repository);
     const submit = await screen.findByRole("button", { name: "Create Game" });
     await user.click(submit);
-    expect(screen.getByRole("button", { name: "Creating Game…" })).toBeDisabled();
+    // The busy state and the write both arrive asynchronously; assert them by waiting rather
+    // than by assuming a microtask ordering that parallel workers do not guarantee.
+    expect(await screen.findByRole("button", { name: "Creating Game…" })).toBeDisabled();
+    await waitFor(() => {
+      expect(repository.activeSaves).toHaveLength(1);
+    });
+    await user.click(screen.getByRole("button", { name: "Creating Game…" }));
     expect(repository.activeSaves).toHaveLength(1);
     resolveSave?.();
     await screen.findByRole("heading", { name: "Ready" });
@@ -399,7 +682,9 @@ describe("setup flow", () => {
     const user = userEvent.setup();
     renderInjectedApp("/play/new", application);
     await user.click(await screen.findByRole("button", { name: "Create Game" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Choose whether undo is allowed.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Choose whether takebacks are allowed.",
+    );
     expect(screen.getByRole("group", { name: "Practice options" })).toHaveAttribute(
       "aria-describedby",
       "undo-error",
@@ -428,7 +713,7 @@ describe("recovery gate", () => {
       await screen.findByRole("heading", { name: "Your saved game needs attention" }),
     ).toBeVisible();
     expect(screen.queryByText("secret-raw-key")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Create a game" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Set up your game" })).not.toBeInTheDocument();
   });
 
   it("retries recovery through the application service", async () => {

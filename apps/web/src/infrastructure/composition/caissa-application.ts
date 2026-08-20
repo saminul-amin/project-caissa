@@ -15,8 +15,10 @@ import {
   type ReviewRepository,
   type WallClock,
   type ActiveGameRecoveryService,
+  type OpponentRuntime,
 } from "../../application";
 import { BrowserGameIdGenerator } from "../identity";
+import { BrowserRequestIdGenerator, createEngineOpponentRuntime } from "../opponent";
 import {
   BrowserWallClock,
   closeCaissaDatabase,
@@ -27,9 +29,11 @@ import {
 import { BrowserMonotonicClock, type MonotonicClock } from "../time";
 
 export interface CaissaApplication {
+  readonly analysisCacheRepository: AnalysisCacheRepository;
   readonly historyService: GameHistoryService;
   readonly monotonicClock: MonotonicClock;
   readonly newGameService: NewGameService;
+  readonly opponentRuntime: OpponentRuntime;
   readonly recoveryService: ActiveGameRecoveryService;
   readonly startupService: GameStartupService;
   close(): void;
@@ -42,6 +46,7 @@ export interface CreateCaissaApplicationOptions {
   readonly gameIdGenerator: GameIdGenerator;
   readonly gameRepository: GameRepository;
   readonly monotonicClock: MonotonicClock;
+  readonly opponentRuntime?: OpponentRuntime;
   readonly preferencesRepository: PreferencesRepository;
   readonly reviewRepository: ReviewRepository;
   readonly wallClock: WallClock;
@@ -74,20 +79,26 @@ export function createCaissaApplication(
     wallClock: options.wallClock,
   });
 
-  // These adapters belong to this graph even though the current read-only slice has no actions for them.
-  void options.analysisCacheRepository;
-  void options.preferencesRepository;
+  const opponentRuntime =
+    options.opponentRuntime ??
+    createEngineOpponentRuntime({
+      monotonicClock: options.monotonicClock,
+      requestIdFactory: new BrowserRequestIdGenerator(),
+    });
 
   let closed = false;
   return Object.freeze({
+    analysisCacheRepository: options.analysisCacheRepository,
     close() {
       if (closed) return;
       closed = true;
+      opponentRuntime.dispose();
       options.close?.();
     },
     historyService,
     monotonicClock: options.monotonicClock,
     newGameService,
+    opponentRuntime,
     recoveryService,
     startupService,
   });

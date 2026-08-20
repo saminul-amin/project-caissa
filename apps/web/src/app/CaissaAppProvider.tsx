@@ -18,9 +18,13 @@ import {
 } from "@caissa/chess-core";
 
 import {
+  DEFAULT_OPPONENT_PROFILE_ID,
   DISCARD_ACTIVE_GAME_CONFIRMATION,
   REPLACE_ACTIVE_GAME_CONFIRMATION,
   createRecoveryReadModel,
+  isOpponentProfileId,
+  type OpponentProfileId,
+  type OpponentRuntimeStatus,
   type CreateNewGameCommand,
   type NewGameSetup,
   type NewGameSetupField,
@@ -55,6 +59,8 @@ export type AppStartupViewState =
   | { readonly status: "failed" };
 
 export interface ActiveGameRuntimeView {
+  readonly hasExternalOpponent: boolean;
+  readonly opponentProfileId: OpponentProfileId | undefined;
   readonly orientation: "black" | "white";
   readonly persistence: SessionPersistenceState;
   readonly session: GameSession;
@@ -73,11 +79,13 @@ export interface CaissaAppActions {
   readonly continueWithoutRestoring: () => void;
   readonly createNewGame: (command: CreateNewGameCommand) => Promise<CreateGameActionResult>;
   readonly discardActiveGame: () => Promise<"discarded" | "failed">;
+  readonly exportCurrentGamePgn: () => string | undefined;
   readonly pauseCurrentGame: () => Promise<GameControlUiResult>;
   readonly readCurrentLegalMoves: (query?: LegalMoveQuery) => readonly LegalMove[];
   readonly restartCurrentGame: () => Promise<GameControlUiResult>;
   readonly resumeCurrentGame: () => Promise<GameControlUiResult>;
   readonly retryCurrentGamePersistence: () => Promise<"nothing-pending" | "succeeded" | "failed">;
+  readonly retryOpponentTurn: () => Promise<void>;
   readonly retryStartup: () => Promise<void>;
   readonly startCurrentGame: () => Promise<StartGameUiResult>;
   readonly submitCurrentHumanMove: (
@@ -89,6 +97,8 @@ export interface CaissaAppActions {
 export interface CaissaAppContextValue {
   readonly actions: CaissaAppActions;
   readonly activeGame: ActiveGameRuntimeView | undefined;
+  readonly application: CaissaApplication;
+  readonly opponentStatus: OpponentRuntimeStatus;
   readonly startup: AppStartupViewState;
 }
 
@@ -126,6 +136,9 @@ export function CaissaAppProvider({
   );
   const ownsApplication = injectedApplication === undefined;
   const [startup, setStartup] = useState<AppStartupViewState>({ status: "restoring" });
+  const [opponentStatus, setOpponentStatus] = useState<OpponentRuntimeStatus>(() =>
+    application.opponentRuntime.getStatus(),
+  );
   const [runtime, setRuntime] = useState<RuntimeOwner | undefined>();
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   const mounted = useRef(false);
@@ -138,10 +151,17 @@ export function CaissaAppProvider({
     runtimeRef.current = runtime;
   }, [runtime]);
 
-  const replaceRuntime = useCallback((next: RuntimeOwner | undefined) => {
-    runtimeRef.current = next;
-    setRuntime(next);
-  }, []);
+  useEffect(() => application.opponentRuntime.subscribe(setOpponentStatus), [application]);
+
+
+  const replaceRuntime = useCallback(
+    (next: RuntimeOwner | undefined) => {
+      application.opponentRuntime.cancel();
+      runtimeRef.current = next;
+      setRuntime(next);
+    },
+    [application],
+  );
 
   const restore = useCallback(
     async (useRecoveryService = false): Promise<void> => {
@@ -237,6 +257,65 @@ export function CaissaAppProvider({
     [],
   );
 
+  const runOpponentTurn = useCallback(async (): Promise<void> => {
+    const owner = runtimeRef.current;
+    if (!owner) return;
+    if (pendingMutation.current === owner.coordinator) return;
+
+    const session = owner.coordinator.getSession();
+    if (session.lifecycle.phase !== "opponent-turn" && session.lifecycle.phase !== "degraded") {
+      return;
+    }
+
+    pendingMutation.current = owner.coordinator;
+    try {
+      await application.opponentRuntime.runTurn({
+        coordinator: owner.coordinator,
+        profileId: readOpponentProfileId(session) ?? DEFAULT_OPPONENT_PROFILE_ID,
+      });
+    } finally {
+      if (pendingMutation.current === owner.coordinator) pendingMutation.current = undefined;
+      if (runtimeRef.current === owner && mounted.current) {
+        setRuntimeVersion((value) => value + 1);
+      }
+    }
+  }, [application]);
+
+  const activeGame = useMemo<ActiveGameRuntimeView | undefined>(() => {
+    void runtimeVersion;
+    if (!runtime) return undefined;
+    const session = runtime.coordinator.getSession();
+    return Object.freeze({
+      hasExternalOpponent: hasExternalOpponent(session),
+      opponentProfileId: readOpponentProfileId(session),
+      orientation: runtime.orientation,
+      persistence: runtime.coordinator.getPersistenceState(),
+      projectClock: () =>
+        projectClockDisplay(
+          runtime.coordinator.getSession().clock,
+          application.monotonicClock.now(),
+        ),
+      session,
+    });
+  }, [application, runtime, runtimeVersion]);
+
+  const opponentTurnPending =
+    activeGame !== undefined &&
+    activeGame.hasExternalOpponent &&
+    activeGame.session.lifecycle.phase === "opponent-turn";
+
+  useEffect(() => {
+    if (!opponentTurnPending) return;
+    void runOpponentTurn();
+  }, [opponentTurnPending, runOpponentTurn, runtimeVersion]);
+
+  useEffect(
+    () => () => {
+      application.opponentRuntime.cancel();
+    },
+    [application, runtime],
+  );
+
   const actions = useMemo<CaissaAppActions>(
     () => ({
       abandonCurrentGame() {
@@ -267,6 +346,15 @@ export function CaissaAppProvider({
         setStartup({ status: "no-active-game" });
         return "discarded";
       },
+      exportCurrentGamePgn() {
+        const owner = runtimeRef.current;
+        if (!owner) return undefined;
+        try {
+          return String(owner.coordinator.exportPgn());
+        } catch {
+          return undefined;
+        }
+      },
       async retryCurrentGamePersistence() {
         const owner = runtimeRef.current;
         if (!owner) return "nothing-pending";
@@ -294,6 +382,9 @@ export function CaissaAppProvider({
         return runGameControl("resume", (owner) =>
           owner.coordinator.resume(application.monotonicClock.now()),
         );
+      },
+      retryOpponentTurn() {
+        return runOpponentTurn();
       },
       retryStartup() {
         return restore(true);
@@ -354,25 +445,16 @@ export function CaissaAppProvider({
         );
       },
     }),
-    [application, createGame, replaceRuntime, restore, runGameControl],
+    [application, createGame, replaceRuntime, restore, runGameControl, runOpponentTurn],
   );
 
-  const activeGame = useMemo<ActiveGameRuntimeView | undefined>(() => {
-    void runtimeVersion;
-    if (!runtime) return undefined;
-    return Object.freeze({
-      orientation: runtime.orientation,
-      persistence: runtime.coordinator.getPersistenceState(),
-      projectClock: () =>
-        projectClockDisplay(
-          runtime.coordinator.getSession().clock,
-          application.monotonicClock.now(),
-        ),
-      session: runtime.coordinator.getSession(),
-    });
-  }, [application, runtime, runtimeVersion]);
-
-  const value: CaissaAppContextValue = { actions, activeGame, startup };
+  const value: CaissaAppContextValue = {
+    actions,
+    activeGame,
+    application,
+    opponentStatus,
+    startup,
+  };
 
   return <CaissaAppContext.Provider value={value}>{children}</CaissaAppContext.Provider>;
 }
@@ -382,6 +464,21 @@ export function useCaissaApp(): CaissaAppContextValue {
   const value = useContext(CaissaAppContext);
   if (!value) throw new Error("useCaissaApp must be used within CaissaAppProvider.");
   return value;
+}
+
+function hasExternalOpponent(session: GameSession): boolean {
+  const { participants } = session.configuration;
+  return (
+    participants.white.kind === "external-opponent" ||
+    participants.black.kind === "external-opponent"
+  );
+}
+
+function readOpponentProfileId(session: GameSession): OpponentProfileId | undefined {
+  const { participants } = session.configuration;
+  const external =
+    participants.white.kind === "external-opponent" ? participants.white : participants.black;
+  return isOpponentProfileId(external.profile) ? external.profile : undefined;
 }
 
 function toStartupView(

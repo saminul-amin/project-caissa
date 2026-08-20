@@ -2,6 +2,7 @@ export {
   DEFAULT_NEW_GAME_SETUP,
   REPLACE_ACTIVE_GAME_CONFIRMATION,
   TIME_CONTROL_OPTIONS,
+  buildParticipants,
   createNewGameService,
   validateNewGameSetup,
   type ActiveGamePresenceResult,

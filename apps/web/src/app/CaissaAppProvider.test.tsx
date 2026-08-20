@@ -10,7 +10,11 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { CaissaAppProvider, useCaissaApp } from "./CaissaAppProvider";
-import { DEFAULT_NEW_GAME_SETUP, type GamePersistenceResult } from "../application";
+import {
+  DEFAULT_NEW_GAME_SETUP,
+  type GamePersistenceResult,
+  type GameSessionCoordinator,
+} from "../application";
 import { createDeferred, retryableStorageError } from "../test/application-service-test-kit";
 import { createTestApplication } from "../test/caissa-app-test-kit";
 
@@ -169,12 +173,34 @@ describe("CaissaAppProvider", () => {
     expect(screen.getByTestId("history-count")).toHaveTextContent("0");
   });
 
+  it("returns a safe control failure when no runtime is active", async () => {
+    const user = userEvent.setup();
+    const { application } = createTestApplication();
+    render(
+      <CaissaAppProvider application={application}>
+        <InteractionProbe />
+      </CaissaAppProvider>,
+    );
+    await screen.findByText("no-active-game:none:0");
+    await user.click(screen.getByRole("button", { name: "Pause fixture game" }));
+    expect(screen.getByTestId("result")).toHaveTextContent("failed:no-active-game");
+  });
+
   it("delegates pause, resume, bounded undo, restart, and unawarded abandonment", async () => {
     const user = userEvent.setup();
     let timestamp = 10_000;
     const now = vi.fn(() => parseMonotonicTimestampMs((timestamp += 100)));
     const { application, gameRepository } = createTestApplication(undefined, {
       monotonicClock: { now },
+    });
+    let coordinator: GameSessionCoordinator | undefined;
+    const createGame = application.newGameService.createGame.bind(application.newGameService);
+    vi.spyOn(application.newGameService, "createGame").mockImplementation(async (command) => {
+      const result = await createGame(command);
+      if (result.status === "created" || result.status === "created-unsaved") {
+        coordinator = result.coordinator;
+      }
+      return result;
     });
     render(
       <CaissaAppProvider application={application}>
@@ -183,6 +209,12 @@ describe("CaissaAppProvider", () => {
     );
     await screen.findByText("no-active-game:none:0");
     await user.click(screen.getByRole("button", { name: "Create fixture game" }));
+    if (!coordinator) throw new Error("Expected the provider-owned coordinator fixture.");
+    const pause = vi.spyOn(coordinator, "pause");
+    const resume = vi.spyOn(coordinator, "resume");
+    const undo = vi.spyOn(coordinator, "undoMoves");
+    const restart = vi.spyOn(coordinator, "restart");
+    const abandon = vi.spyOn(coordinator, "abandon");
     await user.click(screen.getByRole("button", { name: "Start fixture game" }));
     await user.click(screen.getByRole("button", { name: "Play e2 to e4" }));
     await user.click(screen.getByRole("button", { name: "Play e7 to e5" }));
@@ -212,7 +244,18 @@ describe("CaissaAppProvider", () => {
       reason: "abandoned",
       status: "abandoned",
     });
-    expect(now).toHaveBeenCalled();
+    expect(pause).toHaveBeenCalledExactlyOnceWith(parseMonotonicTimestampMs(10_400));
+    expect(resume).toHaveBeenCalledExactlyOnceWith(parseMonotonicTimestampMs(10_500));
+    expect(undo).toHaveBeenCalledExactlyOnceWith({
+      expectedRevision: 5,
+      now: parseMonotonicTimestampMs(10_600),
+      plies: 2,
+    });
+    expect(restart).toHaveBeenCalledExactlyOnceWith({ expectedRevision: 6 });
+    expect(abandon).toHaveBeenCalledExactlyOnceWith({
+      now: parseMonotonicTimestampMs(10_800),
+    });
+    expect(now).toHaveBeenCalledTimes(8);
   });
 
   it("rejects a game control while another bounded mutation is still saving", async () => {
@@ -238,6 +281,43 @@ describe("CaissaAppProvider", () => {
     await screen.findByText("no-active-game:player-turn:1");
     expect(screen.getByTestId("history-count")).toHaveTextContent("0");
   });
+
+  it("does not let an old control result overwrite a replacement runtime", async () => {
+    const user = userEvent.setup();
+    const { application, gameRepository } = createTestApplication();
+    render(
+      <CaissaAppProvider application={application}>
+        <InteractionProbe />
+      </CaissaAppProvider>,
+    );
+    await screen.findByText("no-active-game:none:0");
+    await user.click(screen.getByRole("button", { name: "Create fixture game" }));
+    await user.click(screen.getByRole("button", { name: "Start fixture game" }));
+    await screen.findByText("no-active-game:player-turn:1");
+    const originalGameId = screen.getByTestId("game-id").textContent;
+    const oldPauseSave = createDeferred<GamePersistenceResult>();
+    gameRepository.saveActiveImplementation = (checkpoint) => {
+      if (String(checkpoint.gameId) === originalGameId) return oldPauseSave.promise;
+      gameRepository.active = checkpoint;
+      return { status: "saved" };
+    };
+
+    await user.click(screen.getByRole("button", { name: "Pause fixture game" }));
+    await user.click(screen.getByRole("button", { name: "Replace fixture game" }));
+    await screen.findByText("no-active-game:ready:0");
+    const replacementGameId = screen.getByTestId("game-id").textContent;
+    expect(replacementGameId).not.toBe(originalGameId);
+
+    oldPauseSave.resolve({ status: "saved" });
+    await waitFor(() => {
+      expect(screen.getByTestId("result")).toHaveTextContent("rejected:position-changed");
+    });
+    expect(screen.getByTestId("game-id")).toHaveTextContent(replacementGameId);
+    expect(screen.getByTestId("revision")).toHaveTextContent("0");
+
+    await user.click(screen.getByRole("button", { name: "Start fixture game" }));
+    await screen.findByText("no-active-game:player-turn:1");
+  });
 });
 
 function InteractionProbe() {
@@ -250,6 +330,7 @@ function InteractionProbe() {
     <>
       <p>{summary}</p>
       <p data-testid="revision">{activeGame?.session.revision ?? 0}</p>
+      <p data-testid="game-id">{activeGame?.session.gameId ?? "none"}</p>
       <p data-testid="history-count">{activeGame?.session.history.length ?? 0}</p>
       <p data-testid="turn">{activeGame?.session.position.turn ?? "none"}</p>
       <p data-testid="persistence">{activeGame?.persistence.status ?? "none"}</p>
@@ -258,12 +339,27 @@ function InteractionProbe() {
       <button
         onClick={() => {
           void actions.createNewGame({
-            setup: { ...DEFAULT_NEW_GAME_SETUP, timeControlId: "5-minutes" },
+            setup: {
+              ...DEFAULT_NEW_GAME_SETUP,
+              mode: "local-human-vs-human",
+              timeControlId: "5-minutes",
+            },
           });
         }}
         type="button"
       >
         Create fixture game
+      </button>
+      <button
+        onClick={() => {
+          void actions.confirmActiveGameReplacement({
+            ...DEFAULT_NEW_GAME_SETUP,
+            mode: "local-human-vs-human",
+          });
+        }}
+        type="button"
+      >
+        Replace fixture game
       </button>
       <button
         onClick={() => {

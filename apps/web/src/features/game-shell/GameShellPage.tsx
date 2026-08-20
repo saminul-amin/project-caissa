@@ -1,10 +1,15 @@
-import { useRef } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import type { ClockDurationMs, MoveRecord, Square } from "@caissa/chess-core";
+
+import type { OpponentRuntimeStatus } from "../../application/opponent";
 
 import { useCaissaApp } from "../../app/CaissaAppProvider";
 import { moveFeedbackMessage, projectBoardSelection } from "./board-interaction";
 import { ChessBoardAdapter } from "./components/ChessBoardAdapter";
+import { GameControlsPanel } from "./components/GameControlsPanel";
+import { GameResultPanel } from "./components/GameResultPanel";
+import { OpponentStatusPanel } from "./components/OpponentStatusPanel";
 import { KeyboardChessBoard } from "./components/KeyboardChessBoard";
 import { PromotionDialog } from "./components/PromotionDialog";
 import {
@@ -13,11 +18,19 @@ import {
   gameStatusLabel,
   timeControlLabel,
 } from "./game-shell-projections";
+import {
+  gameModeLabel,
+  localPlayerColor,
+  opponentLabel,
+  projectGameResult,
+  projectOpponentPanel,
+} from "./opponent-presentation";
 import { createPiecePositionSummary } from "./position-summary";
 import {
   useActiveGameInteraction,
   type ActiveGameInteraction,
 } from "./use-active-game-interaction";
+import { useActiveGameControls, type ActiveGameControls } from "./use-active-game-controls";
 import { useClockDisplay } from "./use-clock-display";
 
 export function GameShellPage() {
@@ -43,23 +56,56 @@ function ActiveGameShellContainer({
 }: {
   readonly activeGame: NonNullable<ReturnType<typeof useCaissaApp>["activeGame"]>;
 }) {
+  const { actions, opponentStatus } = useCaissaApp();
+  const navigate = useNavigate();
   const interaction = useActiveGameInteraction(activeGame);
+  const controls = useActiveGameControls(activeGame, {
+    interactionStatus:
+      interaction.interaction.status === "promotion-required"
+        ? "promotion-pending"
+        : interaction.interaction.status === "submitting" || interaction.isStarting
+          ? "move-pending"
+          : "idle",
+    onReconcileInteraction: interaction.clearSelection,
+  });
   return (
     <ActiveGameShell
       activeGame={activeGame}
+      controls={controls}
       interaction={interaction}
-      onRetry={() => interaction.retryPersistence()}
+      onExportPgn={actions.exportCurrentGamePgn}
+      onNewGame={() => void navigate("/play/new")}
+      onRetry={() => controls.retryPersistence()}
+      onRetryOpponent={() => void actions.retryOpponentTurn()}
+      onReview={(gameId) => void navigate(`/review/${gameId}`)}
+      opponentStatus={opponentStatus}
     />
   );
 }
 
 interface ActiveGameShellProps {
   readonly activeGame: NonNullable<ReturnType<typeof useCaissaApp>["activeGame"]>;
+  readonly controls?: ActiveGameControls;
   readonly interaction?: ActiveGameInteraction;
+  readonly onExportPgn?: () => string | undefined;
+  readonly onNewGame?: () => void;
   readonly onRetry: () => Promise<unknown>;
+  readonly onRetryOpponent?: () => void;
+  readonly onReview?: (gameId: string) => void;
+  readonly opponentStatus?: OpponentRuntimeStatus;
 }
 
-export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGameShellProps) {
+export function ActiveGameShell({
+  activeGame,
+  controls,
+  interaction,
+  onExportPgn,
+  onNewGame,
+  onRetry,
+  onRetryOpponent,
+  onReview,
+  opponentStatus = { kind: "idle" },
+}: ActiveGameShellProps) {
   const { session } = activeGame;
   const statusRef = useRef<HTMLHeadingElement>(null);
   const clock = useClockDisplay(activeGame);
@@ -69,6 +115,19 @@ export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGame
   const black = createPlayerPanelModel("black", session.configuration.participants.black, session);
   const boardSelection = projectBoardSelection(interaction?.interaction ?? { status: "idle" });
   const isSubmitting = interaction?.interaction.status === "submitting";
+  const controlsLocked = controls?.isLocked ?? false;
+  const [pgnNotice, setPgnNotice] = useState<string | undefined>();
+  const opponentPanel = projectOpponentPanel({
+    hasExternalOpponent: activeGame.hasExternalOpponent,
+    opponentLabel: activeGame.hasExternalOpponent ? opponentLabel(session) : "Caissa",
+    session,
+    status: opponentStatus,
+  });
+  const completedResult = session.result;
+
+  useEffect(() => {
+    if (controls?.focusStatusRequest) statusRef.current?.focus();
+  }, [controls?.focusStatusRequest]);
 
   const beginGame = async () => {
     if (!interaction) return;
@@ -80,7 +139,7 @@ export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGame
     <section className="game-shell route-fade" aria-labelledby="game-status-title">
       <header className="game-shell-heading">
         <div>
-          <p className="eyebrow">Local human game</p>
+          <p className="eyebrow">{gameModeLabel(session)}</p>
           <h1 id="game-status-title" ref={statusRef} tabIndex={-1}>
             {status}
           </h1>
@@ -89,6 +148,40 @@ export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGame
       </header>
 
       <PersistenceStatus persistence={activeGame.persistence} onRetry={onRetry} />
+
+      <OpponentStatusPanel onRetry={() => onRetryOpponent?.()} state={opponentPanel} />
+
+      {completedResult ? (
+        <GameResultPanel
+          {...projectGameResult({
+            playerColor: localPlayerColor(session),
+            result: completedResult,
+          })}
+          isSaved={activeGame.persistence.status !== "finalization-pending"}
+          onExportPgn={() => {
+            const pgn = onExportPgn?.();
+            if (!pgn) {
+              setPgnNotice("Caissa could not read the moves for this game.");
+              return;
+            }
+            void copyPgnToClipboard(pgn).then((copied) => {
+              setPgnNotice(
+                copied
+                  ? "PGN copied to your clipboard."
+                  : "Copying is unavailable here. You can export this game from History instead.",
+              );
+            });
+          }}
+          onNewGame={() => onNewGame?.()}
+          onReview={() => onReview?.(String(session.gameId))}
+        />
+      ) : null}
+
+      {pgnNotice ? (
+        <p className="move-feedback" role="status">
+          {pgnNotice}
+        </p>
+      ) : null}
 
       {session.lifecycle.phase === "ready" && interaction ? (
         <section className="begin-game-panel" aria-labelledby="begin-game-title">
@@ -114,6 +207,10 @@ export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGame
         <p className="move-feedback" role="status">
           {moveFeedbackMessage(interaction.feedback)}
         </p>
+      ) : null}
+
+      {controls ? (
+        <GameControlsPanel controls={controls} isPaused={session.lifecycle.phase === "paused"} />
       ) : null}
 
       <div className="game-layout">
@@ -149,7 +246,7 @@ export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGame
               ariaLabel={`${interaction?.isInteractive ? "Interactive" : "Read-only"} chessboard, ${capitalize(activeGame.orientation)} orientation`}
               captureTargets={boardSelection.captureTargets}
               fen={session.position.fen}
-              interactive={interaction?.isInteractive ?? false}
+              interactive={(interaction?.isInteractive ?? false) && !controlsLocked}
               isInCheck={session.position.inCheck}
               {...(lastMove ? { lastMove: moveSquares(lastMove) } : {})}
               legalTargets={boardSelection.legalTargets}
@@ -165,7 +262,7 @@ export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGame
             />
             {interaction ? (
               <KeyboardChessBoard
-                disabled={!interaction.isInteractive}
+                disabled={!interaction.isInteractive || controlsLocked}
                 fen={session.position.fen}
                 legalTargets={boardSelection.legalTargets}
                 onActivate={(square) => void interaction.selectSquare(square, "keyboard")}
@@ -176,11 +273,13 @@ export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGame
             ) : null}
           </div>
           <p className="board-guidance" role="note">
-            {isSubmitting
-              ? "Committing your move..."
-              : interaction?.isInteractive
-                ? "Move by drag, click or tap a source and destination, or use the keyboard board."
-                : (interaction?.disabledReason ?? "This position is read-only.")}
+            {controlsLocked
+              ? "A game control is in progress. Board input is temporarily unavailable."
+              : isSubmitting
+                ? "Committing your move..."
+                : interaction?.isInteractive
+                  ? "Move by drag, click or tap a source and destination, or use the keyboard board."
+                  : (interaction?.disabledReason ?? "This position is read-only.")}
           </p>
         </div>
 
@@ -194,6 +293,7 @@ export function ActiveGameShell({ activeGame, interaction, onRetry }: ActiveGame
         <PromotionDialog
           choices={interaction.interaction.choices}
           color={interaction.interaction.color}
+          disabled={controlsLocked}
           onCancel={interaction.cancelPromotion}
           onChoose={(piece) => void interaction.choosePromotion(piece)}
         />
@@ -324,6 +424,16 @@ function PersistenceStatus({
       ) : null}
     </section>
   );
+}
+
+async function copyPgnToClipboard(pgn: string): Promise<boolean> {
+  try {
+    if (typeof navigator === "undefined" || typeof navigator.clipboard !== "object") return false;
+    await navigator.clipboard.writeText(pgn);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function moveSquares(move: MoveRecord) {

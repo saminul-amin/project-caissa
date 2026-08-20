@@ -1,6 +1,7 @@
 import type {
   AbandonGameCommand,
   GameController,
+  Pgn,
   GameSession,
   HumanMoveCommand,
   LegalMove,
@@ -35,6 +36,7 @@ import type {
 } from "./game-session-types";
 
 export interface GameSessionCoordinator {
+  exportPgn(): Pgn;
   getSession(): GameSession;
   getLegalMoves(query?: LegalMoveQuery): readonly LegalMove[];
   getPersistenceState(): SessionPersistenceState;
@@ -113,6 +115,10 @@ class SerializedGameSessionCoordinator implements GameSessionCoordinator {
     } else {
       this.persistenceState = cleanState(options.lastPersistedRevision);
     }
+  }
+
+  exportPgn(): Pgn {
+    return this.controller.exportPgn();
   }
 
   getSession(): GameSession {

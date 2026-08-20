@@ -482,6 +482,8 @@ function runtime(
   },
 ): ActiveGameRuntimeView {
   return {
+    hasExternalOpponent: false,
+    opponentProfileId: undefined,
     orientation: "white",
     persistence,
     projectClock: () => projectClockDisplay(session.clock, at(1_000)),
@@ -533,6 +535,8 @@ function createActions(
     retryCurrentGamePersistence: vi.fn<CaissaAppActions["retryCurrentGamePersistence"]>(() =>
       Promise.resolve("succeeded"),
     ),
+    exportCurrentGamePgn: vi.fn(() => '[Event "Caissa"]'),
+    retryOpponentTurn: vi.fn(() => Promise.resolve()),
     retryStartup: vi.fn(() => Promise.resolve()),
     startCurrentGame: vi.fn<CaissaAppActions["startCurrentGame"]>(() =>
       Promise.resolve(
@@ -563,6 +567,8 @@ function installContext(actions: CaissaAppActions, activeGame: ActiveGameRuntime
   vi.mocked(useCaissaApp).mockReturnValue({
     actions,
     activeGame,
+    application: {} as never,
+    opponentStatus: { kind: "idle" },
     startup: { status: "restored" },
   });
 }

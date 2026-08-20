@@ -1,10 +1,12 @@
 import { useRef, useState, type SyntheticEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { OPPONENT_PROFILES, OPPONENT_STRENGTH_DISCLOSURE } from "../../application/opponent";
 import {
   DEFAULT_NEW_GAME_SETUP,
   TIME_CONTROL_OPTIONS,
   validateNewGameSetup,
+  type NewGameMode,
   type NewGameSetup,
   type NewGameSetupField,
 } from "../../application/game-creation";
@@ -13,13 +15,32 @@ import { ConfirmationDialog } from "../../components/ConfirmationDialog";
 
 type FieldErrors = Readonly<Partial<Record<NewGameSetupField | "form", string>>>;
 
+const MODE_OPTIONS: readonly {
+  readonly description: string;
+  readonly id: NewGameMode;
+  readonly title: string;
+}[] = Object.freeze([
+  {
+    description: "Play against Caissa at a strength you choose.",
+    id: "engine",
+    title: "Play the engine",
+  },
+  {
+    description: "Two people share this device and take turns.",
+    id: "local-human-vs-human",
+    title: "Local two-player",
+  },
+]);
+
 export function GameSetupPage() {
-  const { actions } = useCaissaApp();
+  const { actions, opponentStatus } = useCaissaApp();
   const navigate = useNavigate();
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [mode, setMode] = useState<NewGameMode>(DEFAULT_NEW_GAME_SETUP.mode);
   const [replacementSetup, setReplacementSetup] = useState<NewGameSetup | undefined>();
+  const engineUnavailable = opponentStatus.kind === "unavailable";
 
   async function submitSetup(setup: NewGameSetup, replacing = false) {
     setIsSubmitting(true);
@@ -64,6 +85,7 @@ export function GameSetupPage() {
     const candidate = {
       allowUndo: form.get("allowUndo") === "on",
       mode: form.get("mode"),
+      opponentProfileId: form.get("opponentProfileId"),
       orientation: form.get("orientation"),
       timeControlId: form.get("timeControlId"),
     };
@@ -80,11 +102,11 @@ export function GameSetupPage() {
   return (
     <section className="setup-page route-fade" aria-labelledby="setup-title">
       <header className="page-heading">
-        <p className="eyebrow">Local play</p>
-        <h1 id="setup-title">Create a game</h1>
+        <p className="eyebrow">New game</p>
+        <h1 id="setup-title">Set up your game</h1>
         <p>
-          Choose a quiet practice setup. The game will be created in a ready state and its clock
-          will not begin until interactive play is implemented.
+          Everything below stays on this device. Your game is created in a ready state and its clock
+          does not begin until you start playing.
         </p>
       </header>
 
@@ -105,25 +127,39 @@ export function GameSetupPage() {
         </div>
       ) : null}
 
+      {engineUnavailable ? (
+        <p className="inline-notice" role="status">
+          {opponentStatus.detail} You can still play a local two-player game.
+        </p>
+      ) : null}
+
       <form className="setup-form" noValidate onSubmit={handleSubmit}>
         <fieldset aria-describedby={errors.mode ? "mode-error" : undefined}>
-          <legend>Game mode</legend>
+          <legend>Opponent</legend>
           <div className="selection-grid selection-grid-modes">
-            <label className="selection-card">
-              <input defaultChecked name="mode" type="radio" value="local-human-vs-human" />
-              <span className="selection-title">Local two-player</span>
-              <span className="selection-description">Two people share this device.</span>
-            </label>
-            <label className="selection-card is-disabled">
-              <input disabled name="mode" type="radio" value="human-like-ai" />
-              <span className="selection-title">Human-like AI opponent</span>
-              <span className="selection-description">Not yet available.</span>
-            </label>
-            <label className="selection-card is-disabled">
-              <input disabled name="mode" type="radio" value="engine" />
-              <span className="selection-title">Engine opponent</span>
-              <span className="selection-description">Not yet available.</span>
-            </label>
+            {MODE_OPTIONS.map((option) => (
+              <label
+                className={
+                  option.id === "engine" && engineUnavailable
+                    ? "selection-card is-disabled"
+                    : "selection-card"
+                }
+                key={option.id}
+              >
+                <input
+                  checked={mode === option.id}
+                  disabled={option.id === "engine" && engineUnavailable}
+                  name="mode"
+                  onChange={() => {
+                    setMode(option.id);
+                  }}
+                  type="radio"
+                  value={option.id}
+                />
+                <span className="selection-title">{option.title}</span>
+                <span className="selection-description">{option.description}</span>
+              </label>
+            ))}
           </div>
           {errors.mode ? (
             <p className="field-error" id="mode-error">
@@ -131,6 +167,38 @@ export function GameSetupPage() {
             </p>
           ) : null}
         </fieldset>
+
+        {mode === "engine" ? (
+          <fieldset aria-describedby="strength-disclosure">
+            <legend>Strength</legend>
+            <div className="selection-grid selection-grid-strength">
+              {OPPONENT_PROFILES.map((profile) => (
+                <label className="selection-card" key={profile.id}>
+                  <input
+                    defaultChecked={profile.id === DEFAULT_NEW_GAME_SETUP.opponentProfileId}
+                    name="opponentProfileId"
+                    type="radio"
+                    value={profile.id}
+                  />
+                  <span className="selection-title">{profile.label}</span>
+                  <span className="selection-description">{profile.description}</span>
+                </label>
+              ))}
+            </div>
+            <p className="field-note" id="strength-disclosure">
+              {OPPONENT_STRENGTH_DISCLOSURE}
+            </p>
+            {errors.opponentProfileId ? (
+              <p className="field-error">{errors.opponentProfileId}</p>
+            ) : null}
+          </fieldset>
+        ) : (
+          <input
+            name="opponentProfileId"
+            type="hidden"
+            value={DEFAULT_NEW_GAME_SETUP.opponentProfileId}
+          />
+        )}
 
         <fieldset aria-describedby={errors.timeControlId ? "time-control-error" : undefined}>
           <legend>Time control</legend>
@@ -155,28 +223,8 @@ export function GameSetupPage() {
           ) : null}
         </fieldset>
 
-        <fieldset aria-describedby={errors.allowUndo ? "undo-error" : undefined}>
-          <legend>Practice options</legend>
-          <label className="check-row">
-            <input
-              defaultChecked={DEFAULT_NEW_GAME_SETUP.allowUndo}
-              name="allowUndo"
-              type="checkbox"
-            />
-            <span>
-              <strong>Allow undo</strong>
-              <small>Keep takebacks available for local practice.</small>
-            </span>
-          </label>
-          {errors.allowUndo ? (
-            <p className="field-error" id="undo-error">
-              {errors.allowUndo}
-            </p>
-          ) : null}
-        </fieldset>
-
         <fieldset aria-describedby={errors.orientation ? "orientation-error" : undefined}>
-          <legend>Board orientation</legend>
+          <legend>{mode === "engine" ? "Play as" : "Board orientation"}</legend>
           <div className="selection-grid selection-grid-orientation">
             {(["white", "black"] as const).map((orientation) => (
               <label className="selection-card selection-card-compact" key={orientation}>
@@ -193,6 +241,30 @@ export function GameSetupPage() {
           {errors.orientation ? (
             <p className="field-error" id="orientation-error">
               {errors.orientation}
+            </p>
+          ) : null}
+        </fieldset>
+
+        <fieldset aria-describedby={errors.allowUndo ? "undo-error" : undefined}>
+          <legend>Practice options</legend>
+          <label className="check-row">
+            <input
+              defaultChecked={DEFAULT_NEW_GAME_SETUP.allowUndo}
+              name="allowUndo"
+              type="checkbox"
+            />
+            <span>
+              <strong>Allow takebacks</strong>
+              <small>
+                {mode === "engine"
+                  ? "Take back your move and the reply while you practise."
+                  : "Keep takebacks available for local practice."}
+              </small>
+            </span>
+          </label>
+          {errors.allowUndo ? (
+            <p className="field-error" id="undo-error">
+              {errors.allowUndo}
             </p>
           ) : null}
         </fieldset>
@@ -237,13 +309,15 @@ function errorsFromFields(fields: readonly NewGameSetupField[]): FieldErrors {
 function fieldError(field: NewGameSetupField): string {
   switch (field) {
     case "mode":
-      return "Choose the available local two-player mode.";
+      return "Choose how you want to play.";
     case "timeControlId":
       return "Choose one of the available time controls.";
     case "allowUndo":
-      return "Choose whether undo is allowed.";
+      return "Choose whether takebacks are allowed.";
     case "orientation":
-      return "Choose White or Black board orientation.";
+      return "Choose White or Black.";
+    case "opponentProfileId":
+      return "Choose one of the available opponent strengths.";
   }
 }
 

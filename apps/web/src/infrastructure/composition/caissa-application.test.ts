@@ -73,6 +73,7 @@ describe("application composition", () => {
         setup: {
           allowUndo: true,
           mode: "local-human-vs-human",
+          opponentProfileId: "club",
           orientation: "white",
           timeControlId: "untimed",
         },

@@ -22,6 +22,8 @@ function runtime(
   orientation: ActiveGameRuntimeView["orientation"] = "white",
 ): ActiveGameRuntimeView {
   return {
+    hasExternalOpponent: false,
+    opponentProfileId: undefined,
     orientation,
     persistence,
     projectClock: () => projectClockDisplay(controller.getSession().clock, at(1_000)),

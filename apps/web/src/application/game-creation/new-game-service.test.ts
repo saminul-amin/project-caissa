@@ -96,7 +96,9 @@ describe("NewGameService", () => {
 
   it("creates a ready local human-versus-human game with a validated ID", async () => {
     const { repository, service } = createSubject();
-    const result = await service.createGame({ setup: DEFAULT_NEW_GAME_SETUP });
+    const result = await service.createGame({
+      setup: { ...DEFAULT_NEW_GAME_SETUP, mode: "local-human-vs-human", timeControlId: "untimed" },
+    });
     expect(result.status).toBe("created");
     if (result.status !== "created") return;
     expect(result.session.gameId).toBe(parseGameId("new-local-game"));
@@ -126,13 +128,50 @@ describe("NewGameService", () => {
   it("preserves undo and orientation choices without changing participant colors", async () => {
     const { service } = createSubject();
     const result = await service.createGame({
-      setup: { ...DEFAULT_NEW_GAME_SETUP, allowUndo: false, orientation: "black" },
+      setup: {
+        ...DEFAULT_NEW_GAME_SETUP,
+        allowUndo: false,
+        mode: "local-human-vs-human",
+        orientation: "black",
+      },
     });
     expect(result.status).toBe("created");
     if (result.status !== "created") return;
     expect(result.orientation).toBe("black");
     expect(result.session.configuration.allowUndo).toBe(false);
     expect(result.session.configuration.participants.white.kind).toBe("human");
+  });
+
+  it("seats the player on the chosen side of an engine game and records the profile", async () => {
+    const { service } = createSubject();
+    const result = await service.createGame({
+      setup: {
+        ...DEFAULT_NEW_GAME_SETUP,
+        mode: "engine",
+        opponentProfileId: "strong",
+        orientation: "black",
+      },
+    });
+    expect(result.status).toBe("created");
+    if (result.status !== "created") return;
+    expect(result.session.configuration.participants).toEqual({
+      black: { kind: "human", label: "You" },
+      white: { kind: "external-opponent", label: "Caissa Strong", profile: "strong" },
+    });
+  });
+
+  it("keeps the engine profile across a checkpoint round trip", async () => {
+    const { service } = createSubject();
+    const result = await service.createGame({
+      setup: { ...DEFAULT_NEW_GAME_SETUP, mode: "engine", opponentProfileId: "newcomer" },
+    });
+    expect(result.status).toBe("created");
+    if (result.status !== "created") return;
+    expect(result.coordinator.getSession().configuration.participants.black).toEqual({
+      kind: "external-opponent",
+      label: "Caissa Newcomer",
+      profile: "newcomer",
+    });
   });
 
   it("does not start the controller or clock during creation", async () => {
@@ -195,7 +234,7 @@ describe("NewGameService", () => {
     const { service } = createSubject();
     const result = await service.createGame({ setup: {} as NewGameSetup });
     expect(result).toEqual({
-      fields: ["mode", "timeControlId", "allowUndo", "orientation"],
+      fields: ["mode", "timeControlId", "allowUndo", "orientation", "opponentProfileId"],
       status: "invalid-setup",
     });
   });
@@ -273,5 +312,11 @@ describe("new-game setup validation", () => {
       fields: ["timeControlId"],
       status: "invalid",
     });
+    expect(
+      validateNewGameSetup({ ...DEFAULT_NEW_GAME_SETUP, opponentProfileId: "grandmaster" }),
+    ).toEqual({ fields: ["opponentProfileId"], status: "invalid" });
+    expect(
+      validateNewGameSetup({ ...DEFAULT_NEW_GAME_SETUP, mode: "local-human-vs-human" }).status,
+    ).toBe("valid");
   });
 });
