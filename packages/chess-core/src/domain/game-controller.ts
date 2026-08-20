@@ -303,7 +303,7 @@ class AuthoritativeGameController implements GameController {
     if (prior.lifecycle.phase === "paused") {
       return rejected(prior, "already-paused");
     }
-    if (prior.lifecycle.phase !== "opponent-turn") {
+    if (prior.lifecycle.phase !== "opponent-turn" && prior.lifecycle.phase !== "degraded") {
       return prior.activeOpponentRequest
         ? rejected(prior, "opponent-request-active")
         : rejected(prior, "invalid-lifecycle");
@@ -324,9 +324,14 @@ class AuthoritativeGameController implements GameController {
       requestId: command.requestId,
       requestedColor,
     });
-    const lifecycle = transitionLifecycleOrThrow(prior.lifecycle, {
-      type: "request-opponent-move",
-    });
+    // A degraded game recovers by opening a fresh request; both paths land in awaiting-opponent
+    // with exactly one active request, which the session invariants require.
+    const lifecycle = transitionLifecycleOrThrow(
+      prior.lifecycle,
+      prior.lifecycle.phase === "degraded"
+        ? { type: "recover-provider" }
+        : { type: "request-opponent-move" },
+    );
     const revision = nextRevision(prior.revision);
     const session = this.commitSession({
       activeOpponentRequest: request,
