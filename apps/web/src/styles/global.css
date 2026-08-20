@@ -2072,6 +2072,71 @@ h2 {
   }
 }
 
+/* History ------------------------------------------------------------------ */
+
+.history-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  list-style: none;
+}
+
+.history-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.history-row[data-outcome="win"] {
+  border-left-color: var(--color-status-success);
+}
+
+.history-row[data-outcome="loss"] {
+  border-left-color: var(--color-status-error);
+}
+
+.history-row[data-outcome="draw"] {
+  border-left-color: var(--color-status-warning);
+}
+
+.history-row-main {
+  min-width: 0;
+}
+
+.history-result {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+
+.history-players {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-secondary);
+}
+
+.history-meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.history-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.history-clear {
+  color: var(--color-status-error);
+}
+
 /* Settings ----------------------------------------------------------------- */
 
 .settings-page {

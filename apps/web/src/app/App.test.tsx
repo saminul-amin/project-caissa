@@ -91,9 +91,9 @@ describe("application startup and routes", () => {
   });
 
   it.each([
-    ["/history", "History"],
+    ["/history", "Game history"],
     ["/settings", "Settings"],
-  ])("keeps the %s placeholder reachable", async (path, heading) => {
+  ])("renders the %s screen", async (path, heading) => {
     renderApp(path);
     expect(await screen.findByRole("heading", { name: heading })).toBeVisible();
   });
