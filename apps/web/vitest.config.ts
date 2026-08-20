@@ -20,6 +20,7 @@ export default defineConfig({
         "src/application/history/**/*.ts",
         "src/application/opponent/**/*.ts",
         "src/application/preferences/**/*.ts",
+        "src/application/review/**/*.ts",
         "src/application/persistence/**/*.ts",
         "src/application/recovery/**/*.ts",
         "src/features/**/*.ts",
@@ -48,7 +49,7 @@ export default defineConfig({
           lines: 88,
           statements: 88,
         },
-        "src/application/opponent/**/*.ts": {
+        "src/application/{opponent,review}/**/*.ts": {
           branches: 85,
           functions: 90,
           lines: 88,

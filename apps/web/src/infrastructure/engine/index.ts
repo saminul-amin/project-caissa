@@ -6,6 +6,10 @@ export {
   type CreateBundledEngineResult,
 } from "./create-engine";
 export {
+  createEngineAnalysisAdapter,
+  type CreateEngineAnalysisAdapterOptions,
+} from "./engine-analysis-adapter";
+export {
   describeEngineCapabilityGap,
   detectEngineCapabilities,
   type EngineCapabilityGap,

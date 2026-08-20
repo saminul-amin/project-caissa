@@ -17,8 +17,11 @@ import {
   type ActiveGameRecoveryService,
   type OpponentRuntime,
   type PreferencesService,
+  type GameReviewService,
   createPreferencesService,
+  createGameReviewService,
 } from "../../application";
+import { createEngineAnalysisAdapter } from "../engine";
 import { BrowserGameIdGenerator } from "../identity";
 import { BrowserRequestIdGenerator, createEngineOpponentRuntime } from "../opponent";
 import {
@@ -38,6 +41,7 @@ export interface CaissaApplication {
   readonly opponentRuntime: OpponentRuntime;
   readonly preferencesService: PreferencesService;
   readonly recoveryService: ActiveGameRecoveryService;
+  readonly reviewService: GameReviewService;
   readonly startupService: GameStartupService;
   close(): void;
 }
@@ -85,6 +89,14 @@ export function createCaissaApplication(
   const preferencesService = createPreferencesService({
     preferencesRepository: options.preferencesRepository,
   });
+  const reviewService = createGameReviewService({
+    analysisCacheRepository: options.analysisCacheRepository,
+    analysisEngine: createEngineAnalysisAdapter(),
+    createRules: options.createRules,
+    historyService,
+    reviewRepository: options.reviewRepository,
+    wallClock: options.wallClock,
+  });
   const opponentRuntime =
     options.opponentRuntime ??
     createEngineOpponentRuntime({
@@ -107,6 +119,7 @@ export function createCaissaApplication(
     opponentRuntime,
     preferencesService,
     recoveryService,
+    reviewService,
     startupService,
   });
 }
