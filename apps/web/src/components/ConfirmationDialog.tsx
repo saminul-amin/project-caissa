@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 interface ConfirmationDialogProps {
   readonly cancelLabel: string;
@@ -6,6 +6,7 @@ interface ConfirmationDialogProps {
   readonly confirmLabel: string;
   readonly destructive?: boolean;
   readonly isBusy?: boolean;
+  readonly initialFocus?: "cancel" | "confirm";
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
   readonly title: string;
@@ -20,22 +21,32 @@ export function ConfirmationDialog({
   confirmLabel,
   destructive = false,
   isBusy = false,
+  initialFocus = "cancel",
   onCancel,
   onConfirm,
   title,
 }: ConfirmationDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const generatedId = useId();
+  const isBusyRef = useRef(isBusy);
+  const onCancelRef = useRef(onCancel);
+
+  useEffect(() => {
+    isBusyRef.current = isBusy;
+    onCancelRef.current = onCancel;
+  }, [isBusy, onCancel]);
 
   useEffect(() => {
     const previousFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    cancelRef.current?.focus();
+    (initialFocus === "confirm" ? confirmRef.current : cancelRef.current)?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !isBusy) {
+      if (event.key === "Escape" && !isBusyRef.current) {
         event.preventDefault();
-        onCancel();
+        onCancelRef.current();
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
@@ -57,12 +68,15 @@ export function ConfirmationDialog({
       document.removeEventListener("keydown", handleKeyDown);
       previousFocus?.focus();
     };
-  }, [isBusy, onCancel]);
+  }, [initialFocus]);
 
-  const titleId = `dialog-title-${title.toLowerCase().replace(/[^a-z0-9]+/gu, "-")}`;
+  const titleId = `${generatedId}-title`;
+  const descriptionId = `${generatedId}-description`;
   return (
-    <div className="dialog-backdrop">
+    <div className="dialog-backdrop" data-dialog-backdrop="true">
       <div
+        aria-busy={isBusy}
+        aria-describedby={descriptionId}
         aria-labelledby={titleId}
         aria-modal="true"
         className="confirmation-dialog"
@@ -70,7 +84,9 @@ export function ConfirmationDialog({
         role="dialog"
       >
         <h2 id={titleId}>{title}</h2>
-        <div className="dialog-copy">{children}</div>
+        <div className="dialog-copy" id={descriptionId}>
+          {children}
+        </div>
         <div className="dialog-actions">
           <button
             className="button button-secondary"
@@ -85,6 +101,7 @@ export function ConfirmationDialog({
             className={destructive ? "button button-destructive" : "button button-primary"}
             disabled={isBusy}
             onClick={onConfirm}
+            ref={confirmRef}
             type="button"
           >
             {isBusy ? "Working…" : confirmLabel}

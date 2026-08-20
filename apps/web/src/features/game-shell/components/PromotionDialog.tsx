@@ -4,6 +4,7 @@ import type { Color, PromotionPiece } from "@caissa/chess-core";
 interface PromotionDialogProps {
   readonly choices: readonly PromotionPiece[];
   readonly color: Color;
+  readonly disabled?: boolean;
   readonly onCancel: () => void;
   readonly onChoose: (piece: PromotionPiece) => void;
 }
@@ -13,7 +14,13 @@ const pieceSymbols: Readonly<Record<Color, Readonly<Record<PromotionPiece, strin
   white: { bishop: "\u2657", knight: "\u2658", queen: "\u2655", rook: "\u2656" },
 };
 
-export function PromotionDialog({ choices, color, onCancel, onChoose }: PromotionDialogProps) {
+export function PromotionDialog({
+  choices,
+  color,
+  disabled = false,
+  onCancel,
+  onChoose,
+}: PromotionDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const choiceRefs = useRef(new Map<PromotionPiece, HTMLButtonElement>());
 
@@ -28,7 +35,7 @@ export function PromotionDialog({ choices, color, onCancel, onChoose }: Promotio
   }, [choices]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && !disabled) {
       event.preventDefault();
       onCancel();
       return;
@@ -70,6 +77,7 @@ export function PromotionDialog({ choices, color, onCancel, onChoose }: Promotio
             <button
               aria-label={`Promote to ${piece}`}
               className="promotion-choice"
+              disabled={disabled}
               key={piece}
               onClick={() => {
                 onChoose(piece);
@@ -89,6 +97,7 @@ export function PromotionDialog({ choices, color, onCancel, onChoose }: Promotio
         </div>
         <button
           className="button button-secondary promotion-cancel"
+          disabled={disabled}
           onClick={onCancel}
           type="button"
         >

@@ -52,6 +52,22 @@ module.exports = {
       to: { path: "^apps/web/src/application/" },
     },
     {
+      name: "presentational-game-controls-do-not-import-application-authority",
+      severity: "error",
+      from: {
+        path: "^apps/web/src/(features/game-shell/components/GameControlsPanel|components/ConfirmationDialog)\\.tsx$",
+      },
+      to: { path: "^apps/web/src/(app|application|infrastructure)/" },
+    },
+    {
+      name: "game-controls-do-not-import-infrastructure",
+      severity: "error",
+      from: {
+        path: "^apps/web/src/features/game-shell/(game-controls|use-active-game-controls)\\.ts$",
+      },
+      to: { path: "^apps/web/src/infrastructure/" },
+    },
+    {
       name: "setup-does-not-construct-game-controller",
       severity: "error",
       from: { path: "^apps/web/src/features/game-setup/" },

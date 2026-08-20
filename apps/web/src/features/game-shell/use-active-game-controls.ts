@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { parseUndoPlyCount, type GameSession } from "@caissa/chess-core";
+import { parseUndoPlyCount, type GameSession, type UndoPlyCount } from "@caissa/chess-core";
 
 import { useCaissaApp, type ActiveGameRuntimeView } from "../../app/CaissaAppProvider";
 import type {
@@ -27,13 +27,17 @@ export interface ActiveGameControls {
   readonly focusStatusRequest: number;
   readonly isLocked: boolean;
   readonly pendingControl: PendingGameControl | undefined;
+  readonly abandonGame: () => Promise<GameControlUiResult>;
   readonly cancelConfirmation: () => void;
   readonly confirmControl: () => Promise<void>;
-  readonly pauseGame: () => Promise<void>;
+  readonly pauseGame: () => Promise<GameControlUiResult>;
   readonly requestAbandon: () => void;
   readonly requestRestart: () => void;
   readonly requestUndoMoves: (plies: 1 | 2) => Promise<void>;
-  readonly resumeGame: () => Promise<void>;
+  readonly restartGame: () => Promise<GameControlUiResult>;
+  readonly resumeGame: () => Promise<GameControlUiResult>;
+  readonly retryPersistence: () => Promise<void>;
+  readonly undoMoves: (plies: UndoPlyCount) => Promise<GameControlUiResult>;
 }
 
 interface ActiveGameControlsOptions {
@@ -71,14 +75,20 @@ export function useActiveGameControls(
     async (
       control: PendingGameControl,
       operation: () => Promise<GameControlUiResult>,
-    ): Promise<void> => {
-      if (pendingRef.current) return;
+    ): Promise<GameControlUiResult> => {
+      if (pendingRef.current) {
+        return Object.freeze({
+          control,
+          messageKey: "operation-in-progress",
+          status: "blocked",
+        });
+      }
       pendingRef.current = control;
       setPendingControl(control);
       setFeedback(undefined);
       try {
         const result = await operation();
-        const message = resultMessage(result, session);
+        const message = gameControlResultMessage(result, session);
         if (result.status === "applied" || result.status === "completed") {
           options.onReconcileInteraction();
           setFeedback(Object.freeze({ kind: "success", message }));
@@ -87,6 +97,7 @@ export function useActiveGameControls(
           setFeedback(Object.freeze({ kind: "error", message }));
         }
         setAnnouncement(message);
+        return result;
       } finally {
         pendingRef.current = undefined;
         setPendingControl(undefined);
@@ -104,11 +115,18 @@ export function useActiveGameControls(
     [actions.resumeCurrentGame, run],
   );
   const undoMoves = useCallback(
-    (plies: 1 | 2) => {
-      const parsed = parseUndoPlyCount(plies);
-      return run(plies === 1 ? "undo-one" : "undo-two", () => actions.undoCurrentGameMoves(parsed));
+    (plies: UndoPlyCount) => {
+      return run(plies === 1 ? "undo-one" : "undo-two", () => actions.undoCurrentGameMoves(plies));
     },
     [actions, run],
+  );
+  const restartGame = useCallback(
+    () => run("restart", actions.restartCurrentGame),
+    [actions.restartCurrentGame, run],
+  );
+  const abandonGame = useCallback(
+    () => run("abandon", actions.abandonCurrentGame),
+    [actions.abandonCurrentGame, run],
   );
 
   const requestUndoMoves = useCallback(
@@ -117,7 +135,7 @@ export function useActiveGameControls(
         setConfirmation(Object.freeze({ kind: "undo-completed", plies }));
         return;
       }
-      await undoMoves(plies);
+      await undoMoves(parseUndoPlyCount(plies));
     },
     [session.lifecycle.phase, undoMoves],
   );
@@ -128,18 +146,22 @@ export function useActiveGameControls(
     try {
       switch (current.kind) {
         case "undo-completed":
-          await undoMoves(current.plies);
+          await undoMoves(parseUndoPlyCount(current.plies));
           break;
         case "restart":
-          await run("restart", actions.restartCurrentGame);
+          await restartGame();
           break;
         case "abandon":
-          await run("abandon", actions.abandonCurrentGame);
+          await abandonGame();
       }
     } finally {
       setConfirmation(undefined);
     }
-  }, [actions, confirmation, run, undoMoves]);
+  }, [abandonGame, confirmation, restartGame, undoMoves]);
+
+  const retryPersistence = useCallback(async () => {
+    await actions.retryCurrentGamePersistence();
+  }, [actions]);
 
   return {
     announcement,
@@ -149,6 +171,7 @@ export function useActiveGameControls(
     focusStatusRequest,
     isLocked: pendingControl !== undefined || confirmation !== undefined,
     pendingControl,
+    abandonGame,
     cancelConfirmation: () => {
       setConfirmation(undefined);
     },
@@ -161,21 +184,31 @@ export function useActiveGameControls(
       setConfirmation(Object.freeze({ kind: "restart" }));
     },
     requestUndoMoves,
+    restartGame,
     resumeGame,
+    retryPersistence,
+    undoMoves,
   };
 }
 
-function resultMessage(result: GameControlUiResult, session: GameSession): string {
+export function gameControlResultMessage(
+  result: GameControlUiResult,
+  session: GameSession,
+): string {
   if ("messageKey" in result) {
     return rejectionMessage(result.messageKey);
   }
 
   const persistence = persistenceMessage(result.persistence);
   if (result.status === "completed") {
+    if (result.expiredColor) {
+      const action = result.control === "pause" ? "paused" : "ended as abandoned";
+      return `${capitalize(result.expiredColor)}'s time expired before the game could be ${action}.${persistence}`;
+    }
     if (result.control === "abandon") {
       return `Game ended without awarding a winner.${persistence}`;
     }
-    return `${capitalize(result.expiredColor ?? session.position.turn)}'s time expired before the game could be paused.${persistence}`;
+    return `${capitalize(session.position.turn)}'s time expired before the game could be paused.${persistence}`;
   }
 
   switch (result.control) {

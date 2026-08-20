@@ -157,6 +157,66 @@ for (const sourceRoot of [
       report(file, "game-shell-persistence-boundary", "game shell calls persistence directly");
     }
 
+    if (
+      !isTestFile &&
+      /(?:\/components\/GameControlsPanel|\/components\/ConfirmationDialog)\.tsx$/u.test(
+        relativeFile,
+      ) &&
+      /from\s+["'][^"']*(?:\/app\/|\/application\/|\/infrastructure\/|@caissa\/chess-core)/u.test(
+        source,
+      )
+    ) {
+      report(
+        file,
+        "game-control-presentation-boundary",
+        "presentational controls import application or domain authority",
+      );
+    }
+
+    if (
+      !isTestFile &&
+      /^apps\/web\/src\/features\/game-shell\/(?:game-controls|use-active-game-controls)\.ts$/u.test(
+        relativeFile,
+      )
+    ) {
+      if (
+        /from\s+["'][^"']*(?:\/infrastructure\/|game-session-coordinator)/u.test(source) ||
+        /\b(?:GameSessionCoordinator|GameController|ChessRulesPort|ChessJsRulesAdapter)\b/u.test(
+          source,
+        )
+      ) {
+        report(
+          file,
+          "game-control-authority-boundary",
+          "control facade imports mutable application or chess authority",
+        );
+      }
+      if (/\bawardedWinner\b/u.test(source)) {
+        report(
+          file,
+          "unawarded-abandonment-boundary",
+          "game controls attempt to award an abandonment winner",
+        );
+      }
+      if (/\bcreateAbandonedGameResult\b|status\s*:\s*["']abandoned["']/u.test(source)) {
+        report(
+          file,
+          "abandonment-result-authority-boundary",
+          "game controls construct an abandonment result",
+        );
+      }
+      if (
+        /\bsession\.(?:clock|history|lifecycle|position(?:\.fen)?)\s*=/u.test(source) ||
+        /\bsession\.history\.(?:push|splice|pop|shift|unshift)\s*\(/u.test(source)
+      ) {
+        report(
+          file,
+          "game-control-state-mutation-boundary",
+          "game controls directly mutate authoritative session state",
+        );
+      }
+    }
+
     if (/^apps\/web\/src\/application\//u.test(relativeFile)) {
       if (/from\s+["']dexie(?:\/[^"']*)?["']/u.test(source)) {
         report(file, "application-persistence-port-boundary", "application code imports Dexie");
