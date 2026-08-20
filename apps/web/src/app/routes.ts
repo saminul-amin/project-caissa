@@ -21,6 +21,6 @@ export const APP_ROUTES = [
   {
     path: "/settings",
     label: "Settings",
-    description: "Application settings have not been implemented yet.",
+    description: "Appearance, sound, and your local data.",
   },
 ] as const satisfies readonly AppRoute[];
