@@ -19,10 +19,10 @@ export default defineConfig({
         "src/application/game-session/**/*.ts",
         "src/application/history/**/*.ts",
         "src/application/opponent/**/*.ts",
-        "src/application/preferences/**/*.ts",
-        "src/application/review/**/*.ts",
         "src/application/persistence/**/*.ts",
+        "src/application/preferences/**/*.ts",
         "src/application/recovery/**/*.ts",
+        "src/application/review/**/*.ts",
         "src/features/**/*.ts",
         "src/features/**/*.tsx",
         "src/infrastructure/audio/**/*.ts",
@@ -92,8 +92,12 @@ export default defineConfig({
       },
     },
     environment: "jsdom",
+    // Interaction tests assert behaviour, not speed. Coverage instrumentation plus parallel
+    // workers can push a user-event sequence past the 5s default, which shows up as a flake.
+    hookTimeout: 20_000,
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     maxWorkers: 4,
     setupFiles: ["src/test/setup.ts"],
+    testTimeout: 20_000,
   },
 });
