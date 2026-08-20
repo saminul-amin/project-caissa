@@ -4,7 +4,13 @@ export default defineConfig({
   test: {
     coverage: {
       enabled: true,
-      exclude: ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test/**"],
+      exclude: [
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "src/test/**",
+        // A thin Web Worker wrapper with no branching logic; covered by the browser tests.
+        "src/infrastructure/engine/engine-transport.ts",
+      ],
       include: [
         "src/app/**/*.ts",
         "src/app/**/*.tsx",
@@ -12,12 +18,15 @@ export default defineConfig({
         "src/application/game-creation/**/*.ts",
         "src/application/game-session/**/*.ts",
         "src/application/history/**/*.ts",
+        "src/application/opponent/**/*.ts",
         "src/application/persistence/**/*.ts",
         "src/application/recovery/**/*.ts",
         "src/features/**/*.ts",
         "src/features/**/*.tsx",
         "src/infrastructure/composition/**/*.ts",
+        "src/infrastructure/engine/**/*.ts",
         "src/infrastructure/identity/**/*.ts",
+        "src/infrastructure/opponent/**/*.ts",
         "src/infrastructure/time/**/*.ts",
         "src/infrastructure/config/persistence-config.ts",
         "src/infrastructure/persistence/**/*.ts",
@@ -32,6 +41,12 @@ export default defineConfig({
           statements: 88,
         },
         "src/application/game-creation/**/*.ts": {
+          branches: 85,
+          functions: 90,
+          lines: 88,
+          statements: 88,
+        },
+        "src/application/opponent/**/*.ts": {
           branches: 85,
           functions: 90,
           lines: 88,

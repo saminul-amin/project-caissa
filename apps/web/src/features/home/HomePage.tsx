@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { OPPONENT_STRENGTH_DISCLOSURE } from "../../application/opponent";
 import { useCaissaApp } from "../../app/CaissaAppProvider";
 
 export function HomePage() {
@@ -7,11 +8,11 @@ export function HomePage() {
   return (
     <div className="home-page route-fade">
       <section className="hero" aria-labelledby="home-title">
-        <p className="eyebrow">Human-like chess. Meaningful improvement.</p>
+        <p className="eyebrow">Play well. Understand why.</p>
         <h1 id="home-title">Play Chess Beyond the Best Move</h1>
         <p className="hero-description">
-          Face human-like opponents, understand the decisions behind your games, and improve through
-          analysis designed for people—not machines.
+          Choose an opponent you can actually beat, play a complete game of chess, and afterwards
+          see the handful of moments that decided it — all on your own device.
         </p>
         <div className="hero-actions">
           {activeGame ? (
@@ -25,25 +26,28 @@ export function HomePage() {
           >
             Play a Game
           </Link>
-          <a className="button button-ghost" href="#human-like-ai">
-            Discover Human-Like AI
+          <a className="button button-ghost" href="#how-caissa-works">
+            How Caissa Works
           </a>
         </div>
         <p className="milestone-note" role="note">
-          Local two-player setup is available in this milestone. AI opponents are described below
-          but are not playable yet.
+          Nothing you play is uploaded. Games, settings, and analysis stay in this browser.
         </p>
       </section>
 
-      <section className="product-principles" id="human-like-ai" aria-labelledby="ai-title">
+      <section className="product-principles" id="how-caissa-works" aria-labelledby="how-title">
         <div>
           <p className="eyebrow">Beyond evaluation</p>
-          <h2 id="ai-title">Chess software can be powerful without feeling cold.</h2>
+          <h2 id="how-title">Chess software can be powerful without feeling cold.</h2>
         </div>
         <p>
-          Caissa is being built to pair reliable chess analysis with the context of how people
-          actually decide. Human-like AI and guided review remain future milestones; this release
-          begins with a correct, private, local foundation.
+          Caissa runs a full chess engine inside your browser. Six strength settings let you pick a
+          game that is a fight rather than a rout, and every finished game can be replayed through
+          the same engine to show where the result actually turned.
+        </p>
+        <p>
+          Caissa tells you what the analysis found and stops there. It will not guess what you were
+          thinking, and it does not claim to know your rating. {OPPONENT_STRENGTH_DISCLOSURE}
         </p>
       </section>
     </div>

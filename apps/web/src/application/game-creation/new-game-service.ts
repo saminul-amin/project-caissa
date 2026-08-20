@@ -11,6 +11,12 @@ import {
 } from "@caissa/chess-core";
 
 import {
+  DEFAULT_OPPONENT_PROFILE_ID,
+  findOpponentProfile,
+  isOpponentProfileId,
+  type OpponentProfileId,
+} from "../opponent";
+import {
   createGameSessionCoordinator,
   type CreateGameSessionCoordinatorOptions,
   type GameSessionCoordinator,
@@ -21,7 +27,7 @@ import type { GameRepository, PersistenceError, WallClock } from "../persistence
 export const REPLACE_ACTIVE_GAME_CONFIRMATION = "replace-active-game" as const;
 
 export type ReplaceActiveGameConfirmation = typeof REPLACE_ACTIVE_GAME_CONFIRMATION;
-export type NewGameMode = "local-human-vs-human";
+export type NewGameMode = "engine" | "local-human-vs-human";
 export type BoardOrientation = Color;
 export type TimeControlOptionId = "untimed" | "3-plus-2" | "5-minutes" | "10-minutes";
 
@@ -57,15 +63,18 @@ export const TIME_CONTROL_OPTIONS: readonly TimeControlOption[] = Object.freeze(
 export interface NewGameSetup {
   readonly allowUndo: boolean;
   readonly mode: NewGameMode;
+  /** Only meaningful for engine games; ignored for local two-player games. */
+  readonly opponentProfileId: OpponentProfileId;
   readonly orientation: BoardOrientation;
   readonly timeControlId: TimeControlOptionId;
 }
 
 export const DEFAULT_NEW_GAME_SETUP: NewGameSetup = Object.freeze({
   allowUndo: true,
-  mode: "local-human-vs-human",
+  mode: "engine",
+  opponentProfileId: DEFAULT_OPPONENT_PROFILE_ID,
   orientation: "white",
-  timeControlId: "untimed",
+  timeControlId: "10-minutes",
 });
 
 export interface CreateNewGameCommand {
@@ -104,7 +113,8 @@ export type CreateNewGameResult =
   | { readonly status: "storage-unavailable" }
   | { readonly status: "failed" };
 
-export type NewGameSetupField = "allowUndo" | "mode" | "orientation" | "timeControlId";
+export type NewGameSetupField =
+  "allowUndo" | "mode" | "opponentProfileId" | "orientation" | "timeControlId";
 
 export interface NewGameService {
   inspectActiveGame(): Promise<ActiveGamePresenceResult>;
@@ -182,10 +192,7 @@ class DefaultNewGameService implements NewGameService {
           allowUndo: validation.setup.allowUndo,
           gameId: this.options.gameIdGenerator.create(),
           initialPosition: { kind: "standard" },
-          participants: {
-            black: { kind: "human", label: "Black" },
-            white: { kind: "human", label: "White" },
-          },
+          participants: buildParticipants(validation.setup),
           timeControl: option.timeControl,
         },
         rules: this.options.createRules(),
@@ -257,22 +264,60 @@ export function validateNewGameSetup(value: unknown): SetupValidation {
     });
   }
   const fields: NewGameSetupField[] = [];
-  if (value.mode !== "local-human-vs-human") fields.push("mode");
+  if (value.mode !== "local-human-vs-human" && value.mode !== "engine") fields.push("mode");
   if (!isTimeControlOptionId(value.timeControlId)) fields.push("timeControlId");
   if (typeof value.allowUndo !== "boolean") fields.push("allowUndo");
   if (value.orientation !== "white" && value.orientation !== "black") fields.push("orientation");
+  if (!isOpponentProfileId(value.opponentProfileId)) fields.push("opponentProfileId");
   if (fields.length > 0) {
     return Object.freeze({ fields: Object.freeze(fields), status: "invalid" });
   }
   return Object.freeze({
     setup: Object.freeze({
       allowUndo: value.allowUndo as boolean,
-      mode: "local-human-vs-human",
+      mode: value.mode as NewGameMode,
+      opponentProfileId: value.opponentProfileId as OpponentProfileId,
       orientation: value.orientation as BoardOrientation,
       timeControlId: value.timeControlId as TimeControlOptionId,
     }),
     status: "valid",
   });
+}
+
+/**
+ * The human always plays the chosen board orientation in an engine game, so the board a
+ * player looks at and the side they control can never disagree.
+ */
+export function buildParticipants(setup: NewGameSetup): {
+  readonly black: {
+    readonly kind: "external-opponent" | "human";
+    readonly label: string;
+    readonly profile?: string;
+  };
+  readonly white: {
+    readonly kind: "external-opponent" | "human";
+    readonly label: string;
+    readonly profile?: string;
+  };
+} {
+  if (setup.mode === "local-human-vs-human") {
+    return Object.freeze({
+      black: Object.freeze({ kind: "human" as const, label: "Black" }),
+      white: Object.freeze({ kind: "human" as const, label: "White" }),
+    });
+  }
+
+  const profile = findOpponentProfile(setup.opponentProfileId);
+  const engine = Object.freeze({
+    kind: "external-opponent" as const,
+    label: `Caissa ${profile.label}`,
+    profile: profile.id,
+  });
+  const human = Object.freeze({ kind: "human" as const, label: "You" });
+
+  return setup.orientation === "white"
+    ? Object.freeze({ black: engine, white: human })
+    : Object.freeze({ black: human, white: engine });
 }
 
 function timeControlOption(

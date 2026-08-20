@@ -1,3 +1,4 @@
+export type { OpponentRuntime, OpponentRuntimeStatus } from "./opponent-runtime";
 export type {
   OpponentMoveContext,
   OpponentMoveResult,
