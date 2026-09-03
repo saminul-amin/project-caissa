@@ -8,6 +8,20 @@ you the moments that actually decided the game.
 
 Everything runs on your device. There are no accounts, no servers, and no analytics.
 
+![Caissa: playing the bundled engine, clocks running, moves recorded locally](docs/media/caissa-board.png)
+
+### The review is the point
+
+A finished game is replayed through the same bundled engine. You get per-side accuracy, an
+evaluation curve, and the handful of moves that actually changed the result — each one
+explained by the analysis rather than by a guess about what you meant.
+
+![Game review: per-side accuracy, evaluation curve and key moments](docs/media/caissa-review.png)
+
+![Key moments, each explained from the engine analysis](docs/media/caissa-key-moments.png)
+
+All of this is computed on your device. Nothing is uploaded.
+
 ## What Version 1 does
 
 - **Play the engine** at six named strengths, or play a local two-player game.
