@@ -27,9 +27,14 @@ const dryRun = arguments_.has("--dry-run");
 const skipVerify = arguments_.has("--skip-verify");
 
 function git(args, options = {}) {
-  return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: "pipe", ...options })
-    .toString()
-    .trim();
+  // With inherited stdio there is no captured output, and execFileSync returns null.
+  const output = execFileSync("git", args, {
+    cwd: root,
+    encoding: "utf8",
+    stdio: "pipe",
+    ...options,
+  });
+  return output === null ? "" : output.toString().trim();
 }
 
 function run(command, args) {
