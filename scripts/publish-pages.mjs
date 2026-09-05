@@ -83,9 +83,17 @@ try {
 
   git(["add", "--all"], { cwd: worktree });
   const staged = git(["status", "--porcelain"], { cwd: worktree });
-  if (staged === "") {
-    console.log("publish-pages: the published site already matches this build; nothing to push.");
+  const publishedFrom = remoteHasBranch
+    ? /Source-Commit: ([0-9a-f]{40})/u.exec(
+        git(["log", "-1", "--format=%B"], { cwd: worktree }),
+      )?.[1]
+    : undefined;
+  if (staged === "" && publishedFrom === sourceCommit) {
+    console.log("publish-pages: the published site already matches this commit; nothing to push.");
   } else {
+    // An unchanged build from a newer source commit still gets a content-empty commit, so the
+    // branch always names the source tree it was verified against.
+    const unchanged = staged === "";
     git(
       [
         "-c",
@@ -94,8 +102,14 @@ try {
         "user.email=release@caissa.invalid",
         "commit",
         "--quiet",
+        ...(unchanged ? ["--allow-empty"] : []),
         "-m",
-        `Publish ${sourceSummary}\n\nSource-Commit: ${sourceCommit}`,
+        [
+          `Publish ${sourceSummary}`,
+          "",
+          ...(unchanged ? ["Build output unchanged."] : []),
+          `Source-Commit: ${sourceCommit}`,
+        ].join("\n"),
       ],
       { cwd: worktree },
     );
