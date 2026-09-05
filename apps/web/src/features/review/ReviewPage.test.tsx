@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +9,14 @@ import { useCaissaApp } from "../../app/CaissaAppProvider";
 import { ReviewPage } from "./ReviewPage";
 
 vi.mock("../../app/CaissaAppProvider", () => ({ useCaissaApp: vi.fn() }));
+
+const boardSpy = vi.hoisted(() => vi.fn());
+vi.mock("react-chessboard", () => ({
+  Chessboard: (props: { readonly options: { readonly position: string } }) => {
+    boardSpy(props.options);
+    return <div data-position={props.options.position} data-testid="library-board" />;
+  },
+}));
 
 const report: GameReviewReport = {
   analysisDepth: 14,
@@ -183,6 +191,75 @@ describe("ReviewPage", () => {
     await waitFor(() => {
       expect(cancel).toHaveBeenCalled();
     });
+  });
+
+  it("opens on the first key moment and shows the position before that move", async () => {
+    install(vi.fn(completed));
+    renderPage();
+
+    await screen.findByText("62.5%");
+    expect(screen.getByText("Key moment 1 of 1")).toBeVisible();
+    expect(screen.getByRole("img", { name: /Position before move 2, Bc4 by White/ })).toBeVisible();
+    const current = screen.getAllByRole("listitem", { current: true });
+    expect(current).toHaveLength(2);
+    expect(current[0]).toHaveTextContent("Move 2: Bc4");
+    expect(current[1]).toHaveTextContent("Bc4");
+    expect(screen.getByRole("slider", { name: "Move position" })).toHaveValue("3");
+  });
+
+  it("steps the board, the marker, and the move list together", async () => {
+    install(vi.fn(completed));
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("62.5%");
+
+    await user.click(screen.getByRole("button", { name: "Previous move" }));
+
+    expect(screen.getByRole("img", { name: /Position before move 1, e4 by White/ })).toBeVisible();
+    expect(screen.getByText("Every move", { selector: ".eyebrow" })).toBeVisible();
+    expect(screen.getByRole("slider", { name: "Move position" })).toHaveValue("1");
+    expect(screen.getByRole("button", { name: "First move" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Previous key moment" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Next key moment" }));
+    expect(screen.getByText("Key moment 1 of 1")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Next move" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show 1. e4 on the board" }));
+    expect(screen.getByRole("slider", { name: "Move position" })).toHaveValue("1");
+    await user.click(screen.getByRole("button", { name: "Show key moment 1 on the board" }));
+    expect(screen.getByRole("slider", { name: "Move position" })).toHaveValue("3");
+  });
+
+  it("follows the arrow keys and the scrubber", async () => {
+    install(vi.fn(completed));
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("62.5%");
+
+    screen.getByRole("button", { name: "Previous move" }).focus();
+    await user.keyboard("{Home}");
+    expect(screen.getByRole("slider", { name: "Move position" })).toHaveValue("1");
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("slider", { name: "Move position" })).toHaveValue("3");
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.getByRole("slider", { name: "Move position" })).toHaveValue("1");
+    await user.keyboard("{End}");
+    expect(screen.getByRole("slider", { name: "Move position" })).toHaveValue("3");
+
+    fireEvent.change(screen.getByRole("slider", { name: "Move position" }), {
+      target: { value: "1" },
+    });
+    expect(screen.getByRole("img", { name: /Position before move 1/ })).toBeVisible();
   });
 
   it("says nothing stood out when no key moment was found", async () => {

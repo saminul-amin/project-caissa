@@ -617,7 +617,7 @@ Documentation is complete. Version 1 implementation is complete and packaged for
 | Architecture | Approved, amended by ADR-0005 |
 | AI architecture | Approved, amended by ADR-0003 |
 | Testing strategy | Approved |
-| Deployment and release | Approved, amended by ADR-0004 and ADR-0005 |
+| Deployment and release | Approved, amended by ADR-0004, ADR-0005, and ADR-0006 |
 | Coding guidelines | Approved |
 | Security and privacy | Approved |
 | Project roadmap | Approved, resequenced by ADR-0003 |
@@ -653,6 +653,9 @@ the reason, the alternatives, and the consequences.
 
 Routing moved to hash-based URLs (ADR-0005) so one build works at a domain root, in a
 subdirectory, and inside an itch.io iframe.
+
+The web application is published to GitHub Pages from a `gh-pages` branch by a manual,
+documented script rather than a CI workflow (ADR-0006).
 
 ## 7.2 Deferred to Version 2
 

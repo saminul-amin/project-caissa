@@ -167,9 +167,10 @@ describe("ChessBoardAdapter", () => {
     );
     const styles = capturedOptions().squareStyles;
     expect(styles?.e2?.boxShadow).toContain("var(--color-focus)");
-    expect(styles?.e3?.backgroundImage).toContain("var(--color-border-strong)");
-    expect(styles?.d3?.backgroundImage).toContain("transparent 54%");
-    expect(styles?.d3?.backgroundImage).not.toBe(styles?.e3?.backgroundImage);
+    // Quiet and capture targets each raise a different custom property; the stylesheet draws
+    // a dot for one and a ring for the other, so the distinction never rests on colour.
+    expect(styles?.e3).toEqual({ "--board-hint": "1" });
+    expect(styles?.d3).toEqual({ "--board-capture": "1" });
   });
 });
 

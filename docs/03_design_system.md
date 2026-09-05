@@ -180,19 +180,20 @@ Semantic colors must remain muted enough to fit the product while retaining acce
 
 ```css
 :root {
-  --color-bg-app: #0B0D0F;
-  --color-bg-surface: #101316;
-  --color-bg-raised: #15191D;
-  --color-bg-elevated: #1B2025;
-  --color-bg-hover: #22282E;
+  /* Implemented as warm ink rather than the cool ink scale above; see tokens.css. */
+  --color-bg-app: #0D0C0A;
+  --color-bg-surface: #14120F;
+  --color-bg-raised: #1A1815;
+  --color-bg-elevated: #211E1A;
+  --color-bg-hover: #29251F;
 
-  --color-border-subtle: #2A3138;
-  --color-border-strong: #3C454E;
+  --color-border-subtle: #2C2822;
+  --color-border-strong: #423B32;
 
-  --color-text-primary: #FAF8F2;
-  --color-text-secondary: #CFC7B9;
-  --color-text-muted: #AFA79B;
-  --color-text-disabled: #817A71;
+  --color-text-primary: #F5EFE4;
+  --color-text-secondary: #CFC5B5;
+  --color-text-muted: #A2978A;
+  --color-text-disabled: #7A7166;
 
   --color-accent: #3E9D89;
   --color-accent-hover: #4EAC98;
@@ -209,13 +210,17 @@ Light theme is allowed but not required for the earliest prototype.
 
 | Token | Value |
 |---|---:|
-| App background | `#F4F0E8` |
-| Primary surface | `#FBF9F4` |
-| Raised surface | `#FFFFFF` |
-| Primary text | `#171A1D` |
-| Secondary text | `#4E555C` |
-| Border | `#D7D0C4` |
-| Accent | `#2F7F70` |
+| App background | `#F3EEE4` |
+| Primary surface | `#FBF8F2` |
+| Raised surface | `#F6F1E7` |
+| Primary text | `#1C1915` |
+| Secondary text | `#4B453D` |
+| Border | `#DDD4C4` |
+| Accent | `#276B5F` |
+
+The implemented palettes for both themes live in `packages/design-tokens/tokens.css` and
+`apps/web/src/app/theme-palettes.ts`; those files are the source of truth when this table
+and the code disagree.
 
 Light theme must preserve the same hierarchy and should not be treated as a simple color inversion.
 

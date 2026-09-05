@@ -7,8 +7,8 @@ describe("selectThemeVariables", () => {
     const dark = selectThemeVariables({ boardTheme: "caissa-classic", theme: "dark" });
     const light = selectThemeVariables({ boardTheme: "caissa-classic", theme: "light" });
 
-    expect(dark["--color-bg-app"]).toBe("#0b0d0f");
-    expect(light["--color-bg-app"]).toBe("#f6f3ec");
+    expect(dark["--color-bg-app"]).toBe("#0d0c0a");
+    expect(light["--color-bg-app"]).toBe("#f3eee4");
     expect(dark["--color-text-primary"]).not.toBe(light["--color-text-primary"]);
   });
 
@@ -41,7 +41,7 @@ describe("applyThemePalette", () => {
 
     applyThemePalette(root, { boardTheme: "linen", theme: "light" });
 
-    expect(root.style.getPropertyValue("--color-bg-app")).toBe("#f6f3ec");
+    expect(root.style.getPropertyValue("--color-bg-app")).toBe("#f3eee4");
     expect(root.style.getPropertyValue("--color-board-light-square")).toBe("#ece3d2");
     expect(root.style.getPropertyValue("color-scheme")).toBe("light");
   });
@@ -52,7 +52,7 @@ describe("applyThemePalette", () => {
     applyThemePalette(root, { boardTheme: "linen", theme: "light" });
     applyThemePalette(root, { boardTheme: "caissa-classic", theme: "dark" });
 
-    expect(root.style.getPropertyValue("--color-bg-app")).toBe("#0b0d0f");
+    expect(root.style.getPropertyValue("--color-bg-app")).toBe("#0d0c0a");
     expect(root.style.getPropertyValue("--color-board-light-square")).toBe("#cfc4af");
     expect(root.style.getPropertyValue("color-scheme")).toBe("dark");
   });

@@ -15,6 +15,7 @@ export interface PreferenceDocumentAttributes {
 }
 
 const LIGHT_SCHEME_QUERY = "(prefers-color-scheme: light)";
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 /**
  * Preferences become document attributes rather than component props so that board,
@@ -44,21 +45,45 @@ export function resolveTheme(preferences: UserPreferences, prefersLight: boolean
 }
 
 export function usePrefersLightScheme(): boolean {
-  const [prefersLight, setPrefersLight] = useState(() => matchesLightScheme());
+  return useMediaQuery(LIGHT_SCHEME_QUERY);
+}
+
+/**
+ * Whether motion should be reduced right now: an explicit preference wins, and "system"
+ * defers to the operating system. Components that drive animation from script (piece
+ * movement, the board flip, smooth scrolling) read this; CSS reads the matching document
+ * attribute and media query instead.
+ */
+export function resolveReducedMotion(
+  preferences: UserPreferences,
+  systemPrefersReduced: boolean,
+): boolean {
+  if (preferences.reducedMotion === "reduce") return true;
+  if (preferences.reducedMotion === "no-preference") return false;
+  return systemPrefersReduced;
+}
+
+export function useReducedMotion(preferences: UserPreferences): boolean {
+  const systemPrefersReduced = useMediaQuery(REDUCED_MOTION_QUERY);
+  return resolveReducedMotion(preferences, systemPrefersReduced);
+}
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => matchesQuery(query));
 
   useEffect(() => {
     if (typeof matchMedia !== "function") return;
-    const query = matchMedia(LIGHT_SCHEME_QUERY);
+    const list = matchMedia(query);
     const listener = (event: MediaQueryListEvent) => {
-      setPrefersLight(event.matches);
+      setMatches(event.matches);
     };
-    query.addEventListener("change", listener);
+    list.addEventListener("change", listener);
     return () => {
-      query.removeEventListener("change", listener);
+      list.removeEventListener("change", listener);
     };
-  }, []);
+  }, [query]);
 
-  return prefersLight;
+  return matches;
 }
 
 export function usePreferenceEffects(preferences: UserPreferences): void {
@@ -80,10 +105,10 @@ export function usePreferenceEffects(preferences: UserPreferences): void {
   }, [preferences, prefersLight]);
 }
 
-function matchesLightScheme(): boolean {
+function matchesQuery(query: string): boolean {
   if (typeof matchMedia !== "function") return false;
   try {
-    return matchMedia(LIGHT_SCHEME_QUERY).matches;
+    return matchMedia(query).matches;
   } catch {
     return false;
   }

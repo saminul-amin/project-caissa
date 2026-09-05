@@ -6,9 +6,11 @@
     "*.css"
   ],
   "exports": {
-    "./tokens.css": "./tokens.css"
+    "./tokens.css": "./tokens.css",
+    "./fonts/*": "./fonts/*"
   },
   "files": [
-    "tokens.css"
+    "tokens.css",
+    "fonts"
   ]
 }

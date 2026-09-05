@@ -2,10 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import type { GameReviewReport, ReviewedMove } from "../../application/review";
 import {
+  accuracyBarPercent,
   createAccuracyCard,
   createEvaluationCurve,
   createMoveRow,
+  createReviewBoardModel,
+  curveMarkerPosition,
+  defaultReviewPly,
+  findReviewedMove,
   formatEvaluation,
+  stepKeyMoment,
+  stepReviewPly,
   summaryHeadline,
   toSvgPolyline,
 } from "./review-presentation";
@@ -160,5 +167,87 @@ describe("summaryHeadline", () => {
         }),
       ),
     ).toContain("2 moments");
+  });
+});
+
+describe("review board and navigation", () => {
+  const threeMoves = report({
+    keyMoments: [{ explanation: "x", headline: "Move 2: Bc4", ply: 3 }],
+    moves: [
+      move({ ply: 1, winProbabilityAfter: 0.6 }),
+      move({ mover: "black", ply: 2, winProbabilityAfter: 0.5 }),
+      move({
+        moveNumber: 2,
+        ply: 3,
+        san: "Bc4" as never,
+        uci: "f1c4" as never,
+        winProbabilityAfter: 0.2,
+      }),
+    ],
+  });
+
+  it("shows the position before the move with the move itself marked", () => {
+    const model = createReviewBoardModel(
+      move({ moveNumber: 2, san: "Bc4" as never, uci: "f1c4" as never }),
+    );
+    expect(model.fen).toBe("8/8/8/8/8/8/8/8 w - - 0 1");
+    expect(model.lastMove).toEqual({ from: "f1", to: "c4" });
+    expect(model.turn).toBe("white");
+    expect(model.description).toBe("Position before move 2, Bc4 by White");
+    expect(createReviewBoardModel(move({ mover: "black" })).description).toContain("by Black");
+  });
+
+  it("opens on the first key moment, or the last move when nothing stood out", () => {
+    expect(defaultReviewPly(threeMoves)).toBe(3);
+    expect(defaultReviewPly(report({ keyMoments: [], moves: threeMoves.moves }))).toBe(3);
+    expect(defaultReviewPly(report({ keyMoments: [], moves: [] }))).toBeUndefined();
+    expect(findReviewedMove(threeMoves, 2)?.mover).toBe("black");
+    expect(findReviewedMove(threeMoves, 9)).toBeUndefined();
+  });
+
+  it("steps through plies and clamps at both ends", () => {
+    expect(stepReviewPly(threeMoves, 2, "next")).toBe(3);
+    expect(stepReviewPly(threeMoves, 3, "next")).toBe(3);
+    expect(stepReviewPly(threeMoves, 2, "previous")).toBe(1);
+    expect(stepReviewPly(threeMoves, 1, "previous")).toBe(1);
+    expect(stepReviewPly(threeMoves, 2, "first")).toBe(1);
+    expect(stepReviewPly(threeMoves, 2, "last")).toBe(3);
+    expect(stepReviewPly(report({ moves: [] }), 4, "next")).toBe(4);
+  });
+
+  it("steps between key moments in either direction", () => {
+    expect(stepKeyMoment(threeMoves, 1, "next")).toBe(3);
+    expect(stepKeyMoment(threeMoves, 3, "next")).toBeUndefined();
+    expect(stepKeyMoment(threeMoves, 3, "previous")).toBeUndefined();
+    expect(
+      stepKeyMoment(
+        report({
+          keyMoments: [
+            { explanation: "", headline: "", ply: 1 },
+            { explanation: "", headline: "", ply: 3 },
+          ],
+        }),
+        3,
+        "previous",
+      ),
+    ).toBe(1);
+  });
+
+  it("places the curve marker as chart percentages", () => {
+    const curve = createEvaluationCurve(threeMoves);
+    expect(curveMarkerPosition(curve, 1)).toEqual({ leftPercent: 0, topPercent: 40 });
+    expect(curveMarkerPosition(curve, 2)).toEqual({ leftPercent: 50, topPercent: 50 });
+    expect(curveMarkerPosition(curve, 3)).toEqual({ leftPercent: 100, topPercent: 80 });
+    expect(curveMarkerPosition(curve, 7)).toBeUndefined();
+    expect(
+      curveMarkerPosition(createEvaluationCurve(report({ moves: [move({ ply: 1 })] })), 1)
+        ?.leftPercent,
+    ).toBe(50);
+  });
+
+  it("turns accuracy into a bar length and leaves unknown accuracy empty", () => {
+    expect(accuracyBarPercent({ ...threeMoves.black, accuracyPercent: 80.1 })).toBe(80.1);
+    expect(accuracyBarPercent({ ...threeMoves.black, accuracyPercent: undefined })).toBe(0);
+    expect(accuracyBarPercent({ ...threeMoves.black, accuracyPercent: 140 })).toBe(100);
   });
 });

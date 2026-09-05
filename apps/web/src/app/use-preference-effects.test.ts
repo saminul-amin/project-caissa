@@ -1,11 +1,13 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_USER_PREFERENCES } from "../application/settings";
 import {
   projectPreferenceAttributes,
+  resolveReducedMotion,
   resolveTheme,
   usePreferenceEffects,
+  useReducedMotion,
 } from "./use-preference-effects";
 
 afterEach(() => {
@@ -22,6 +24,71 @@ function stubColorScheme(prefersLight: boolean) {
     })),
   );
 }
+
+function stubMediaQueries(matching: readonly string[]) {
+  const listeners = new Map<string, (event: { readonly matches: boolean }) => void>();
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      addEventListener: (
+        _type: string,
+        listener: (event: { readonly matches: boolean }) => void,
+      ) => {
+        listeners.set(query, listener);
+      },
+      matches: matching.includes(query),
+      removeEventListener: vi.fn(),
+    })),
+  );
+  return listeners;
+}
+
+describe("resolveReducedMotion", () => {
+  it("honours an explicit choice regardless of the system preference", () => {
+    expect(
+      resolveReducedMotion({ ...DEFAULT_USER_PREFERENCES, reducedMotion: "reduce" }, false),
+    ).toBe(true);
+    expect(
+      resolveReducedMotion({ ...DEFAULT_USER_PREFERENCES, reducedMotion: "no-preference" }, true),
+    ).toBe(false);
+  });
+
+  it("follows the system preference only when the player chose to", () => {
+    expect(
+      resolveReducedMotion({ ...DEFAULT_USER_PREFERENCES, reducedMotion: "system" }, true),
+    ).toBe(true);
+    expect(
+      resolveReducedMotion({ ...DEFAULT_USER_PREFERENCES, reducedMotion: "system" }, false),
+    ).toBe(false);
+  });
+});
+
+describe("useReducedMotion", () => {
+  it("reads the system reduced-motion query and follows later changes", () => {
+    const listeners = stubMediaQueries(["(prefers-reduced-motion: reduce)"]);
+    const { result } = renderHook(() =>
+      useReducedMotion({ ...DEFAULT_USER_PREFERENCES, reducedMotion: "system" }),
+    );
+
+    expect(result.current).toBe(true);
+    act(() => {
+      listeners.get("(prefers-reduced-motion: reduce)")?.({ matches: false });
+    });
+    expect(result.current).toBe(false);
+  });
+
+  it("treats a runtime without media queries as full motion unless the player reduced it", () => {
+    vi.stubGlobal("matchMedia", undefined);
+    expect(
+      renderHook(() => useReducedMotion({ ...DEFAULT_USER_PREFERENCES, reducedMotion: "system" }))
+        .result.current,
+    ).toBe(false);
+    expect(
+      renderHook(() => useReducedMotion({ ...DEFAULT_USER_PREFERENCES, reducedMotion: "reduce" }))
+        .result.current,
+    ).toBe(true);
+  });
+});
 
 describe("resolveTheme", () => {
   it("honours an explicit choice regardless of the system preference", () => {

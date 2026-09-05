@@ -1,37 +1,82 @@
+/*
+ * Caissa design tokens.
+ *
+ * The dark palette below is the stylesheet default and paints the first frame. The light
+ * palette and both board palettes are written onto the document root at runtime by
+ * `apps/web/src/app/theme-palettes.ts`, which must stay in step with this file: every colour
+ * token declared here has a dark and a light value there.
+ *
+ * Typography is self-hosted. The three faces are latin-subset variable fonts committed under
+ * `./fonts`, so the application makes no network request for type after first load.
+ */
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("./fonts/source-serif-4-latin-wght-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("./fonts/manrope-latin-wght-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2");
+}
+
 :root {
   color-scheme: dark;
 
-  --color-bg-app: #0b0d0f;
-  --color-bg-surface: #101316;
-  --color-bg-raised: #15191d;
-  --color-bg-elevated: #1b2025;
-  --color-bg-hover: #22282e;
+  /* Warm ink surfaces: five tonal steps, each one step lighter than the last. */
+  --color-bg-app: #0d0c0a;
+  --color-bg-surface: #14120f;
+  --color-bg-raised: #1a1815;
+  --color-bg-elevated: #211e1a;
+  --color-bg-hover: #29251f;
 
-  --color-text-primary: #faf8f2;
-  --color-text-secondary: #cfc7b9;
-  --color-text-muted: #afa79b;
-  --color-text-disabled: #817a71;
+  /* Ivory text. Every step is AA against every surface above. */
+  --color-text-primary: #f5efe4;
+  --color-text-secondary: #cfc5b5;
+  --color-text-muted: #a2978a;
+  --color-text-disabled: #7a7166;
 
-  --color-border-subtle: #2a3138;
-  --color-border-strong: #3c454e;
+  --color-border-subtle: #2c2822;
+  --color-border-strong: #423b32;
 
+  /* The one accent. Verdigris, used for action, selection, and focus only. */
   --color-accent: #3e9d89;
   --color-accent-hover: #4eac98;
   --color-accent-pressed: #2f7f70;
   --color-accent-soft: rgb(62 157 137 / 14%);
+  --color-accent-contrast: #0d0c0a;
   --color-focus: #9ed4c6;
 
+  /* Board squares and marks. Shared by both interface themes. */
   --color-board-light-square: #cfc4af;
   --color-board-dark-square: #586b62;
   --color-board-last-move-light: #b8b67e;
   --color-board-last-move-dark: #7e8d62;
   --color-board-check: #a85e59;
+  --color-board-selected: #79a895;
+  --color-board-hint: rgb(16 19 22 / 26%);
+  --color-board-capture: rgb(16 19 22 / 40%);
+  --color-board-frame: #1a1815;
 
-  --color-status-success: #4f9c76;
-  --color-status-warning: #c7963e;
-  --color-status-error: #c66d67;
+  --color-status-success: #5aa57f;
+  --color-status-warning: #d1a04a;
+  --color-status-error: #d3766f;
 
-  --font-display: "Source Serif 4", Georgia, serif;
+  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
   --font-ui: "Manrope", Inter, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
@@ -56,9 +101,11 @@
   --radius-xl: 1.375rem;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 4px 12px rgb(0 0 0 / 24%);
-  --shadow-md: 0 10px 30px rgb(0 0 0 / 30%);
-  --shadow-board: 0 18px 44px rgb(0 0 0 / 34%);
+  /* Warm shadows: brown-black rather than pure black, so depth reads as lamplight. */
+  --shadow-sm: 0 2px 8px rgb(20 14 6 / 28%);
+  --shadow-md: 0 12px 32px rgb(20 14 6 / 36%);
+  --shadow-board: 0 24px 56px rgb(20 14 6 / 46%), 0 2px 6px rgb(20 14 6 / 30%);
+  --shadow-piece: drop-shadow(0 8px 10px rgb(20 14 6 / 45%));
 
   --z-sticky: 20;
   --z-overlay: 60;
@@ -69,6 +116,8 @@
   --motion-standard: 220ms;
   --motion-slow: 320ms;
   --motion-emphasis: 450ms;
+  --motion-piece: 180ms;
+  --motion-draw: 900ms;
 
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);

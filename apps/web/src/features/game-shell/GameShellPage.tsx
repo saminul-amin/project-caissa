@@ -5,6 +5,8 @@ import type { ClockDurationMs, MoveRecord, Square } from "@caissa/chess-core";
 import type { OpponentRuntimeStatus } from "../../application/opponent";
 
 import { useCaissaApp } from "../../app/CaissaAppProvider";
+import { useReducedMotion } from "../../app/use-preference-effects";
+import { revealRowInList } from "../../components/list-scroll";
 import { moveFeedbackMessage, projectBoardSelection } from "./board-interaction";
 import { ChessBoardAdapter } from "./components/ChessBoardAdapter";
 import { GameControlsPanel } from "./components/GameControlsPanel";
@@ -13,6 +15,8 @@ import { OpponentStatusPanel } from "./components/OpponentStatusPanel";
 import { KeyboardChessBoard } from "./components/KeyboardChessBoard";
 import { PromotionDialog } from "./components/PromotionDialog";
 import {
+  boardPlayerOrder,
+  clockUrgency,
   createMoveHistoryRows,
   createPlayerPanelModel,
   gameStatusLabel,
@@ -32,6 +36,9 @@ import {
 } from "./use-active-game-interaction";
 import { useActiveGameControls, type ActiveGameControls } from "./use-active-game-controls";
 import { useClockDisplay } from "./use-clock-display";
+
+/** Piece travel time when motion is allowed; zero under a reduced-motion preference. */
+const PIECE_ANIMATION_MS = 180;
 
 export function GameShellPage() {
   const { activeGame } = useCaissaApp();
@@ -56,8 +63,9 @@ function ActiveGameShellContainer({
 }: {
   readonly activeGame: NonNullable<ReturnType<typeof useCaissaApp>["activeGame"]>;
 }) {
-  const { actions, opponentStatus } = useCaissaApp();
+  const { actions, opponentStatus, preferences } = useCaissaApp();
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion(preferences);
   const interaction = useActiveGameInteraction(activeGame);
   const controls = useActiveGameControls(activeGame, {
     interactionStatus:
@@ -79,6 +87,8 @@ function ActiveGameShellContainer({
       onRetryOpponent={() => void actions.retryOpponentTurn()}
       onReview={(gameId) => void navigate(`/review/${gameId}`)}
       opponentStatus={opponentStatus}
+      pieceAnimationMs={reduceMotion ? 0 : PIECE_ANIMATION_MS}
+      reduceMotion={reduceMotion}
     />
   );
 }
@@ -93,6 +103,8 @@ interface ActiveGameShellProps {
   readonly onRetryOpponent?: () => void;
   readonly onReview?: (gameId: string) => void;
   readonly opponentStatus?: OpponentRuntimeStatus;
+  readonly pieceAnimationMs?: number;
+  readonly reduceMotion?: boolean;
 }
 
 export function ActiveGameShell({
@@ -105,14 +117,20 @@ export function ActiveGameShell({
   onRetryOpponent,
   onReview,
   opponentStatus = { kind: "idle" },
+  pieceAnimationMs = 0,
+  reduceMotion = true,
 }: ActiveGameShellProps) {
   const { session } = activeGame;
   const statusRef = useRef<HTMLHeadingElement>(null);
   const clock = useClockDisplay(activeGame);
   const lastMove = session.history.at(-1);
   const status = gameStatusLabel(session);
-  const white = createPlayerPanelModel("white", session.configuration.participants.white, session);
-  const black = createPlayerPanelModel("black", session.configuration.participants.black, session);
+  const panels = {
+    black: createPlayerPanelModel("black", session.configuration.participants.black, session),
+    white: createPlayerPanelModel("white", session.configuration.participants.white, session),
+  } as const;
+  const remaining = { black: clock.blackRemainingMs, white: clock.whiteRemainingMs } as const;
+  const [topColor, bottomColor] = boardPlayerOrder(activeGame.orientation);
   const boardSelection = projectBoardSelection(interaction?.interaction ?? { status: "idle" });
   const isSubmitting = interaction?.interaction.status === "submitting";
   const controlsLocked = controls?.isLocked ?? false;
@@ -209,40 +227,16 @@ export function ActiveGameShell({
         </p>
       ) : null}
 
-      {controls ? (
-        <GameControlsPanel controls={controls} isPaused={session.lifecycle.phase === "paused"} />
-      ) : null}
-
       <div className="game-layout">
-        <aside className="game-side game-players" aria-label="Players and game status">
-          <PlayerPanel model={black} remainingMs={clock.blackRemainingMs} />
-          <section className="game-info-panel" aria-labelledby="game-information-title">
-            <h2 id="game-information-title">Game information</h2>
-            <dl>
-              <div>
-                <dt>Status</dt>
-                <dd>{status}</dd>
-              </div>
-              <div>
-                <dt>Time control</dt>
-                <dd>{timeControlLabel(session.configuration.timeControl)}</dd>
-              </div>
-              <div>
-                <dt>Undo policy</dt>
-                <dd>{session.configuration.allowUndo ? "Allowed" : "Disabled"}</dd>
-              </div>
-              <div>
-                <dt>Orientation</dt>
-                <dd>{capitalize(activeGame.orientation)}</dd>
-              </div>
-            </dl>
-          </section>
-          <PlayerPanel model={white} remainingMs={clock.whiteRemainingMs} />
-        </aside>
-
         <div className="board-column">
+          <PlayerPanel
+            clockStatus={clock.status}
+            model={panels[topColor]}
+            remainingMs={remaining[topColor]}
+          />
           <div className="interactive-board-stack">
             <ChessBoardAdapter
+              animationDurationMs={pieceAnimationMs}
               ariaLabel={`${interaction?.isInteractive ? "Interactive" : "Read-only"} chessboard, ${capitalize(activeGame.orientation)} orientation`}
               captureTargets={boardSelection.captureTargets}
               fen={session.position.fen}
@@ -272,6 +266,11 @@ export function ActiveGameShell({
               />
             ) : null}
           </div>
+          <PlayerPanel
+            clockStatus={clock.status}
+            model={panels[bottomColor]}
+            remainingMs={remaining[bottomColor]}
+          />
           <p className="board-guidance" role="note">
             {controlsLocked
               ? "A game control is in progress. Board input is temporarily unavailable."
@@ -281,10 +280,37 @@ export function ActiveGameShell({
                   ? "Move by drag, click or tap a source and destination, or use the keyboard board."
                   : (interaction?.disabledReason ?? "This position is read-only.")}
           </p>
+          {controls ? (
+            <GameControlsPanel
+              controls={controls}
+              isPaused={session.lifecycle.phase === "paused"}
+            />
+          ) : null}
         </div>
 
-        <aside className="game-side game-history" aria-label="Position and move history">
-          <MoveHistory history={session.history} />
+        <aside className="game-rail" aria-label="Move history and game status">
+          <MoveHistory history={session.history} reduceMotion={reduceMotion} />
+          <section className="game-info-panel" aria-labelledby="game-information-title">
+            <h2 id="game-information-title">Game information</h2>
+            <dl>
+              <div>
+                <dt>Status</dt>
+                <dd>{status}</dd>
+              </div>
+              <div>
+                <dt>Time control</dt>
+                <dd>{timeControlLabel(session.configuration.timeControl)}</dd>
+              </div>
+              <div>
+                <dt>Undo policy</dt>
+                <dd>{session.configuration.allowUndo ? "Allowed" : "Disabled"}</dd>
+              </div>
+              <div>
+                <dt>Orientation</dt>
+                <dd>{capitalize(activeGame.orientation)}</dd>
+              </div>
+            </dl>
+          </section>
           <PositionCompanion activeGame={activeGame} />
         </aside>
       </div>
@@ -309,20 +335,31 @@ export function ActiveGameShell({
 }
 
 function PlayerPanel({
+  clockStatus,
   model,
   remainingMs,
 }: {
+  readonly clockStatus: ReturnType<typeof useClockDisplay>["status"];
   readonly model: ReturnType<typeof createPlayerPanelModel>;
   readonly remainingMs: ClockDurationMs | undefined;
 }) {
+  const urgency = clockUrgency(remainingMs, clockStatus === "running" && model.isActive);
   return (
-    <section className={model.isActive ? "player-panel is-active" : "player-panel"}>
-      <div>
+    <section
+      className={model.isActive ? "player-panel is-active" : "player-panel"}
+      data-color={model.color}
+    >
+      <span aria-hidden="true" className="player-swatch" />
+      <div className="player-identity">
         <p className="player-color">{capitalize(model.color)}</p>
         <h2>{model.label}</h2>
         <p>{model.kindLabel}</p>
       </div>
-      <p aria-label={`${capitalize(model.color)} clock`} className="clock-value">
+      <p
+        aria-label={`${capitalize(model.color)} clock`}
+        className="clock-value"
+        data-urgency={urgency}
+      >
         {formatClock(remainingMs)}
       </p>
       {model.isActive ? <span className="active-turn-label">Active turn</span> : null}
@@ -330,17 +367,34 @@ function PlayerPanel({
   );
 }
 
-function MoveHistory({ history }: { readonly history: readonly MoveRecord[] }) {
+function MoveHistory({
+  history,
+  reduceMotion,
+}: {
+  readonly history: readonly MoveRecord[];
+  readonly reduceMotion: boolean;
+}) {
   const rows = createMoveHistoryRows(history);
+  const listRef = useRef<HTMLElement>(null);
+  const currentRef = useRef<HTMLLIElement>(null);
+  const lastPly = history.length;
+
+  useEffect(() => {
+    const list = listRef.current;
+    const row = currentRef.current;
+    if (!list || !row) return;
+    revealRowInList(list, row, { reduceMotion });
+  }, [lastPly, reduceMotion]);
+
   return (
-    <section aria-labelledby="move-history-title">
+    <section aria-labelledby="move-history-title" className="move-history" ref={listRef}>
       <h2 id="move-history-title">Move history</h2>
       {rows.length === 0 ? (
         <p className="empty-copy">No moves yet. The game is ready.</p>
       ) : (
         <ol className="move-list">
-          {rows.map((row) => (
-            <li key={row.moveNumber}>
+          {rows.map((row, index) => (
+            <li key={row.moveNumber} ref={index === rows.length - 1 ? currentRef : undefined}>
               <span>{row.moveNumber}.</span>
               <span className={row.white === history.at(-1) ? "is-current" : undefined}>
                 {row.white?.san ?? "-"}

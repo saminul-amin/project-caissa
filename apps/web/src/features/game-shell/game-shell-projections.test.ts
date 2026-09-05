@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { at, createControllerFixture, humanMove } from "../../test/application-service-test-kit";
 import {
+  boardPlayerOrder,
+  clockUrgency,
   createMoveHistoryRows,
   createPlayerPanelModel,
   gameStatusLabel,
@@ -90,5 +92,27 @@ describe("game shell projections", () => {
 
   it("keeps move legality outside projections", () => {
     expect(moveInputFromUci(parseUciMove("e2e4"))).toEqual({ from: "e2", to: "e4" });
+  });
+});
+
+describe("clockUrgency", () => {
+  it("stays calm for untimed, stopped, and comfortable clocks", () => {
+    expect(clockUrgency(undefined, true)).toBe("calm");
+    expect(clockUrgency(5_000 as never, false)).toBe("calm");
+    expect(clockUrgency(31_000 as never, true)).toBe("calm");
+  });
+
+  it("steps to low under thirty seconds and critical under ten", () => {
+    expect(clockUrgency(30_000 as never, true)).toBe("low");
+    expect(clockUrgency(10_001 as never, true)).toBe("low");
+    expect(clockUrgency(10_000 as never, true)).toBe("critical");
+    expect(clockUrgency(0 as never, true)).toBe("critical");
+  });
+});
+
+describe("boardPlayerOrder", () => {
+  it("places the opposing side above the board for either orientation", () => {
+    expect(boardPlayerOrder("white")).toEqual(["black", "white"]);
+    expect(boardPlayerOrder("black")).toEqual(["white", "black"]);
   });
 });

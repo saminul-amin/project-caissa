@@ -47,13 +47,34 @@ BSD-3-Clause, and ISC. Notable direct runtime dependencies:
 
 ## Assets
 
-Caissa ships no font files, image files, sound files, or piece-image sets.
+### Fonts
 
-- Typography uses locally available families with system fallbacks; no webfont is
-  downloaded or redistributed.
+Three typefaces ship as latin-subset variable WOFF2 files in `packages/design-tokens/fonts/`
+and are declared with `@font-face` in `packages/design-tokens/tokens.css`. They were taken
+from the Fontsource builds of the upstream projects (`@fontsource-variable/*@5.3.0`), whose
+files are byte-identical to what Fontsource publishes; only the packaging changed.
+
+- **Source Serif 4** — `source-serif-4-latin-wght-normal.woff2`. Copyright 2014-2023 Adobe,
+  with Reserved Font Name "Source". Upstream: <https://github.com/adobe-fonts/source-serif>.
+  License: SIL Open Font License 1.1 (`LICENSES/OFL-1.1-source-serif-4.txt`).
+- **Manrope** — `manrope-latin-wght-normal.woff2`. Copyright 2019 The Manrope Project
+  Authors. Upstream: <https://github.com/sharanda/manrope>. License: SIL Open Font License
+  1.1 (`LICENSES/OFL-1.1-manrope.txt`).
+- **JetBrains Mono** — `jetbrains-mono-latin-wght-normal.woff2`. Copyright 2020 The
+  JetBrains Mono Project Authors. Upstream: <https://github.com/JetBrains/JetBrainsMono>.
+  License: SIL Open Font License 1.1 (`LICENSES/OFL-1.1-jetbrains-mono.txt`).
+
+The OFL permits bundling the fonts with GPL software; the fonts are not sold on their own,
+their reserved names are not used for modified versions, and the licence texts travel with
+the files. The fonts are not npm dependencies, so `pnpm licenses:check` does not see them;
+this file and `LICENSES/` are their compliance record.
+
+### Other assets
+
 - Chess pieces are rendered by react-chessboard's built-in vector set.
 - Sound effects are synthesised at runtime with the Web Audio API
   (`apps/web/src/infrastructure/audio`). No audio file is distributed.
+- No image files are distributed.
 
 ## Not distributed
 

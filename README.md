@@ -8,7 +8,9 @@ you the moments that actually decided the game.
 
 Everything runs on your device. There are no accounts, no servers, and no analytics.
 
-![Caissa: playing the bundled engine, clocks running, moves recorded locally](docs/media/caissa-board.png)
+**Play it now:** <https://saminul-amin.github.io/project-caissa/>
+
+![Caissa: playing a local game, clocks running, moves recorded locally](docs/media/caissa-board.png)
 
 ### The review is the point
 
@@ -16,9 +18,9 @@ A finished game is replayed through the same bundled engine. You get per-side ac
 evaluation curve, and the handful of moves that actually changed the result — each one
 explained by the analysis rather than by a guess about what you meant.
 
-![Game review: per-side accuracy, evaluation curve and key moments](docs/media/caissa-review.png)
+![Game review: the verdict, per-side accuracy, and the position at the key moment](docs/media/caissa-review.png)
 
-![Key moments, each explained from the engine analysis](docs/media/caissa-key-moments.png)
+![The evaluation curve with its marker, and the key moment explained from the engine analysis](docs/media/caissa-key-moments.png)
 
 All of this is computed on your device. Nothing is uploaded.
 
@@ -108,6 +110,7 @@ pnpm architecture:check   Import boundaries, layering rules, and cycle rejection
 pnpm engine:check         Verify the pinned digests of vendored third-party binaries
 pnpm licenses:check       Reject dependencies outside the permissive allowlist
 pnpm package:itch         Build and produce the itch.io upload archive
+pnpm publish:pages        Verify, build, and push the site to the gh-pages branch
 ```
 
 Install the browser once before the E2E command:
@@ -115,6 +118,24 @@ Install the browser once before the E2E command:
 ```bash
 pnpm exec playwright install chromium
 ```
+
+## Publishing to GitHub Pages
+
+The live site at <https://saminul-amin.github.io/project-caissa/> is the production build
+served as static files from the `gh-pages` branch. Publishing is a deliberate manual step,
+not a GitHub Actions workflow, so it needs no CI minutes and never runs by accident.
+
+```bash
+pnpm publish:pages
+```
+
+The script refuses to run from a tree with uncommitted changes, runs `pnpm verify`, copies
+`apps/web/dist` onto the `gh-pages` branch through a temporary worktree, adds `.nojekyll`,
+commits with the source commit recorded in the message, and pushes. Use `--dry-run` to do
+everything except the push, and `--skip-verify` to rebuild a tree that has already passed the
+gate. The same build works at the domain root, in a subdirectory such as GitHub Pages, and
+inside the itch.io iframe, because Vite builds with a relative base and the router uses hash
+routes (see `docs/adr/0005-hash-routing-for-static-hosting.md`).
 
 ## Releasing to itch.io
 

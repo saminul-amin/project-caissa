@@ -139,25 +139,25 @@ test("switching the theme repaints the whole page, not only new elements", async
   await expect(page.getByText("Settings saved.")).toBeVisible();
 
   const darkShell = await shellColors(page);
-  expect(darkShell.background).toBe("rgb(11, 13, 15)");
-  expect(darkShell.text).toBe("rgb(250, 248, 242)");
+  expect(darkShell.background).toBe("rgb(13, 12, 10)");
+  expect(darkShell.text).toBe("rgb(245, 239, 228)");
 
   await page.getByLabel("Interface theme").selectOption("light");
-  await expect.poll(async () => (await shellColors(page)).background).toBe("rgb(246, 243, 236)");
+  await expect.poll(async () => (await shellColors(page)).background).toBe("rgb(243, 238, 228)");
 
   const lightShell = await shellColors(page);
-  expect(lightShell.text).toBe("rgb(27, 26, 23)");
+  expect(lightShell.text).toBe("rgb(28, 25, 21)");
   // A heading that existed before the switch must repaint too, not just the shell.
   const headingColor = await page
     .getByRole("heading", { name: "Settings" })
     .evaluate((element) => getComputedStyle(element).color);
-  expect(headingColor).toBe("rgb(27, 26, 23)");
+  expect(headingColor).toBe("rgb(28, 25, 21)");
 
   await page.reload();
-  await expect.poll(async () => (await shellColors(page)).background).toBe("rgb(246, 243, 236)");
+  await expect.poll(async () => (await shellColors(page)).background).toBe("rgb(243, 238, 228)");
 
   await page.getByLabel("Interface theme").selectOption("dark");
-  await expect.poll(async () => (await shellColors(page)).background).toBe("rgb(11, 13, 15)");
+  await expect.poll(async () => (await shellColors(page)).background).toBe("rgb(13, 12, 10)");
 });
 
 test("history, review, and settings fit a phone without horizontal scrolling", async ({ page }) => {

@@ -1,4 +1,5 @@
 import type {
+  ClockDurationMs,
   Color,
   GameParticipant,
   GameResult,
@@ -31,6 +32,30 @@ export function createPlayerPanelModel(
     kindLabel: participant.kind === "human" ? "Human player" : "External opponent",
     label: participant.label ?? capitalize(color),
   });
+}
+
+/**
+ * How loudly a clock should read. Only a running clock becomes urgent: a paused or
+ * expired display must stay calm, and an untimed game has no clock at all.
+ */
+export type ClockUrgency = "calm" | "critical" | "low";
+
+export const LOW_TIME_THRESHOLD_MS = 30_000;
+export const CRITICAL_TIME_THRESHOLD_MS = 10_000;
+
+export function clockUrgency(
+  remainingMs: ClockDurationMs | undefined,
+  isRunning: boolean,
+): ClockUrgency {
+  if (remainingMs === undefined || !isRunning) return "calm";
+  if (remainingMs <= CRITICAL_TIME_THRESHOLD_MS) return "critical";
+  if (remainingMs <= LOW_TIME_THRESHOLD_MS) return "low";
+  return "calm";
+}
+
+/** The side shown at the top of the board is the one the viewer is looking across at. */
+export function boardPlayerOrder(orientation: Color): readonly [top: Color, bottom: Color] {
+  return orientation === "white" ? ["black", "white"] : ["white", "black"];
 }
 
 export function createMoveHistoryRows(history: readonly MoveRecord[]): readonly MoveHistoryRow[] {
